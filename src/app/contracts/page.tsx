@@ -42,6 +42,7 @@ function ContractsContent() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [promotingId, setPromotingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const defaultForm = {
     customer_id: searchParams.get('customer_id') || '',
@@ -391,72 +392,107 @@ function ContractsContent() {
             {contracts.map(c => {
               const daysLeft = c.expiry_date ? getDaysLeft(c.expiry_date) : null
               const isExpiringSoon = daysLeft !== null && daysLeft <= 3 && daysLeft >= 0
-              const isEditing = editingId === c.id || promotingId === c.id
+              const isExpanded = expandedId === c.id
               const discAmt = c.discount_amount || calcDiscount(String(c.total_amount || ''), c.discount_type, String(c.discount_value || ''))
               const remain = (c.total_amount || 0) - discAmt - (c.paid_amount || 0)
 
               return (
                 <div key={c.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${
-                  isExpiringSoon ? 'border-rose-200' : isEditing ? 'border-indigo-300' : 'border-slate-100'
+                  isExpiringSoon ? 'border-rose-200' : 'border-slate-100'
                 }`}>
                   <div className={`h-1 ${c.contract_type === '본계약' ? 'bg-emerald-500' : isExpiringSoon ? 'bg-rose-500' : 'bg-amber-400'}`} />
-                  <div className="px-4 py-3.5">
-                    <div className="flex justify-between items-start mb-3">
+
+                  {/* 헤더 — 클릭 시 확장 */}
+                  <button type="button" onClick={() => setExpandedId(isExpanded ? null : c.id)} className="w-full px-4 py-3.5 text-left">
+                    <div className="flex justify-between items-center">
                       <div>
                         <p className="font-bold text-slate-900">{c.customer?.name}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{c.lot_number || '안치단 미정'}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                          c.contract_type === '본계약'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>{c.contract_type}</span>
-                        {daysLeft !== null && (
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            daysLeft <= 1 ? 'bg-rose-100 text-rose-600'
-                            : daysLeft <= 3 ? 'bg-orange-100 text-orange-600'
-                            : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {daysLeft === 0 ? '오늘 만료' : daysLeft < 0 ? '만료됨' : `D-${daysLeft}`}
-                          </span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            c.contract_type === '본계약'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>{c.contract_type}</span>
+                          {daysLeft !== null && (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              daysLeft <= 1 ? 'bg-rose-100 text-rose-600'
+                              : daysLeft <= 3 ? 'bg-orange-100 text-orange-600'
+                              : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {daysLeft === 0 ? '오늘 만료' : daysLeft < 0 ? '만료됨' : `D-${daysLeft}`}
+                            </span>
+                          )}
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* 접힌 상태 요약 */}
+                    {!isExpanded && c.total_amount > 0 && (
+                      <div className="mt-1.5 flex gap-3 text-xs text-slate-400">
+                        <span>분양금 {c.total_amount.toLocaleString()}원</span>
+                        <span className={remain <= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>잔금 {remain.toLocaleString()}원</span>
+                        {c.notes && <span className="truncate max-w-[120px]">📝 {c.notes}</span>}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* 확장된 상세 내용 */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
+                      {/* 금액 내역 */}
+                      {c.total_amount > 0 && (
+                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
+                          <FinRow label="분양금" value={c.total_amount} />
+                          {discAmt > 0 && <FinRow label={c.discount_type === 'rate' ? `할인 (${c.discount_value}%)` : '할인'} value={-discAmt} color="text-indigo-600" />}
+                          {c.paid_amount > 0 && <FinRow label="계약금" value={-c.paid_amount} color="text-amber-600" />}
+                          <div className="border-t border-slate-200 pt-1">
+                            <FinRow label="잔금" value={remain} color={remain <= 0 ? 'text-emerald-600' : 'text-rose-600'} bold />
+                          </div>
+                        </div>
+                      )}
+                      {c.provisional_date && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 font-semibold">계약일</span>
+                          <span className="text-slate-800">{c.provisional_date}</span>
+                        </div>
+                      )}
+                      {c.expiry_date && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 font-semibold">만료일</span>
+                          <span className={isExpiringSoon ? 'text-rose-600 font-bold' : 'text-slate-800'}>{c.expiry_date}</span>
+                        </div>
+                      )}
+                      {c.notes && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">📝 메모</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{c.notes}</p>
+                        </div>
+                      )}
+                      {c.history && (
+                        <div className="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-400 border border-slate-100">
+                          📋 {c.history}
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => { startEdit(c); setExpandedId(null) }}
+                          className="flex-1 text-xs font-semibold border border-slate-200 text-slate-600 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                          수정
+                        </button>
+                        {c.contract_type === '가계약' && (
+                          <button onClick={() => { startPromote(c); setExpandedId(null) }}
+                            className="flex-1 text-xs font-bold border border-emerald-300 text-emerald-700 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
+                            ✅ 본계약 전환
+                          </button>
                         )}
                       </div>
                     </div>
-
-                    {/* 금액 내역 */}
-                    {c.total_amount > 0 && (
-                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1 mb-3">
-                        <FinRow label="분양금" value={c.total_amount} />
-                        {discAmt > 0 && <FinRow label={c.discount_type === 'rate' ? `할인 (${c.discount_value}%)` : '할인'} value={-discAmt} color="text-indigo-600" />}
-                        {c.paid_amount > 0 && <FinRow label="계약금" value={-c.paid_amount} color="text-amber-600" />}
-                        <div className="border-t border-slate-200 pt-1">
-                          <FinRow label="잔금" value={remain} color={remain <= 0 ? 'text-emerald-600' : 'text-rose-600'} bold />
-                        </div>
-                      </div>
-                    )}
-
-                    {c.expiry_date && <p className="text-xs text-slate-400 mb-1">만료일: {c.expiry_date}</p>}
-                    {c.notes && <p className="text-xs text-slate-500 mb-1">{c.notes}</p>}
-                    {c.history && (
-                      <div className="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-400 border border-slate-100 mb-2">
-                        📋 {c.history}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => startEdit(c)}
-                        className="flex-1 text-xs font-semibold border border-slate-200 text-slate-600 py-2 rounded-xl hover:bg-slate-50 transition-colors">
-                        수정
-                      </button>
-                      {c.contract_type === '가계약' && (
-                        <button onClick={() => startPromote(c)}
-                          className="flex-1 text-xs font-bold border border-emerald-300 text-emerald-700 py-2 rounded-xl hover:bg-emerald-50 transition-colors">
-                          ✅ 본계약 전환
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               )
             })}

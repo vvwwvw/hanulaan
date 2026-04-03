@@ -220,7 +220,15 @@ function ProductsContent() {
     })
   }
 
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
   function cancelEdit() { setEditingId(null); setForm(emptyForm) }
+
+  async function deleteProduct(id: string) {
+    if (!confirm('이 판매 내역을 삭제하시겠습니까?')) return
+    await supabase.from('sales_products').delete().eq('id', id)
+    loadAll()
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -439,12 +447,18 @@ function ProductsContent() {
           <div className="space-y-3">
             {products.map(p => {
               const conf = PRODUCT_CONFIG[p.product_type] || { icon: '📦', gradient: 'from-slate-400 to-slate-500', lightBg: 'bg-slate-50', textColor: 'text-slate-600' }
-              const isEditing = editingId === p.id
+              const isExpanded = expandedId === p.id
               return (
-                <div key={p.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${isEditing ? 'border-indigo-300' : 'border-slate-100'}`}>
+                <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className={`h-1 bg-gradient-to-r ${conf.gradient}`} />
-                  <div className="px-4 py-3.5">
-                    <div className="flex justify-between items-start">
+
+                  {/* 헤더 — 클릭 시 확장 */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                    className="w-full px-4 py-3.5 text-left"
+                  >
+                    <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-10 h-10 bg-gradient-to-br ${conf.gradient} rounded-xl flex items-center justify-center text-lg shadow-sm flex-shrink-0`}>
                           {conf.icon}
@@ -456,43 +470,72 @@ function ProductsContent() {
                           </span>
                         </div>
                       </div>
-                      {p.amount && (
-                        <div className="text-right">
-                          <p className="text-base font-bold text-slate-900">{p.amount.toLocaleString()}원</p>
-                          <p className="text-xs text-slate-400">판매가</p>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {p.amount && <p className="text-sm font-bold text-slate-900">{p.amount.toLocaleString()}원</p>}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
                     </div>
 
-                    {/* 유골함 정보 박스 */}
-                    {p.urn_name && (
-                      <div className="mt-2.5 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 flex items-center justify-between">
-                        <p className="text-xs font-semibold text-purple-800">{p.urn_name}</p>
-                        {p.consumer_price && (
-                          <span className="text-xs text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full">소비자가 {p.consumer_price}</span>
-                        )}
+                    {/* 접힌 상태에서 요약 정보 */}
+                    {!isExpanded && (
+                      <div className="mt-1.5 flex gap-3 flex-wrap">
+                        {p.urn_name && <span className="text-xs text-purple-600 font-medium">{p.urn_name}</span>}
+                        {p.funeral_date && <span className="text-xs text-slate-400">장례일: {new Date(p.funeral_date).toLocaleDateString('ko-KR')}</span>}
+                        {p.notes && <span className="text-xs text-slate-400 truncate max-w-[180px]">📝 {p.notes}</span>}
                       </div>
                     )}
+                  </button>
 
-                    <div className="mt-1.5 space-y-0.5">
-                      {p.sangjo_company && <p className="text-xs text-slate-500">업체: {p.sangjo_company}</p>}
-                      {p.funeral_date && <p className="text-xs text-purple-600">장례일: {new Date(p.funeral_date).toLocaleDateString('ko-KR')}</p>}
-                      {p.engraving_info && <p className="text-xs text-indigo-600">각인: {p.engraving_info}</p>}
-                      {p.relocation_date && <p className="text-xs text-orange-600">개장일: {new Date(p.relocation_date).toLocaleDateString('ko-KR')}</p>}
-                      {p.notes && <p className="text-xs text-slate-400 mt-1">{p.notes}</p>}
-                    </div>
-
-                    <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-100">
+                  {/* 확장된 상세 내용 */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-2.5">
+                      {p.urn_name && (
+                        <div className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
+                          <p className="text-xs font-semibold text-purple-800">{p.urn_name}</p>
+                          {p.consumer_price && <span className="text-xs text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full">소비자가 {p.consumer_price}</span>}
+                        </div>
+                      )}
+                      {p.sangjo_company && <DetailRow label="상조 업체" value={p.sangjo_company} />}
+                      {p.funeral_date && <DetailRow label="장례일" value={new Date(p.funeral_date).toLocaleDateString('ko-KR')} />}
+                      {p.engraving_info && <DetailRow label="각인" value={p.engraving_info} />}
+                      {p.relocation_date && <DetailRow label="개장일" value={new Date(p.relocation_date).toLocaleDateString('ko-KR')} />}
+                      {p.amount && <DetailRow label="판매가" value={`${p.amount.toLocaleString()}원`} />}
+                      {p.notes && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">📝 메모</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{p.notes}</p>
+                        </div>
+                      )}
                       <p className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString('ko-KR')}</p>
-                      <button onClick={() => startEdit(p)} className="text-xs font-semibold text-indigo-500 hover:text-indigo-700 transition-colors">수정</button>
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => { startEdit(p); setExpandedId(null) }}
+                          className="flex-1 text-xs font-semibold border border-indigo-200 text-indigo-600 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors">
+                          수정
+                        </button>
+                        <button onClick={() => deleteProduct(p.id)}
+                          className="flex-1 text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors">
+                          삭제
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )
             })}
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-center text-xs">
+      <span className="text-slate-500 font-semibold">{label}</span>
+      <span className="text-slate-800 font-medium">{value}</span>
     </div>
   )
 }
