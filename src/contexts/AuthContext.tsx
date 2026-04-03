@@ -21,7 +21,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        await loadUserProfile(session.user.email!)
+        // 재시도 로직: 최대 3번 시도
+        let profile = null
+        for (let i = 0; i < 3; i++) {
+          const { data } = await supabase.from('users').select('*').eq('email', session.user.email!).single()
+          if (data) { profile = data; break }
+          await new Promise(r => setTimeout(r, 500))
+        }
+        if (profile) setUser(profile as User)
       }
       setLoading(false)
     }).catch(() => {
@@ -30,7 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        await loadUserProfile(session.user.email!)
+        const { data } = await supabase.from('users').select('*').eq('email', session.user.email!).single()
+        if (data) setUser(data as User)
       } else {
         setUser(null)
       }
@@ -38,19 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function loadUserProfile(email: string) {
-    try {
-      const { data } = await supabase.from('users').select('*').eq('email', email).single()
-      if (data) setUser(data as User)
-    } catch {
-      // 프로필 로드 실패 시 무시 (loading false로 전환되면 로그인으로 리다이렉트됨)
-    }
-  }
-
   async function signIn(email: string, password: string): Promise<string | null> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return error.message
-    await loadUserProfile(email)
+    const { data } = await supabase.from('users').select('*').eq('email', email).single()
+    if (data) setUser(data as User)
     return null
   }
 
