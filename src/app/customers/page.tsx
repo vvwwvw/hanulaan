@@ -42,6 +42,7 @@ function CustomersContent() {
   const [dataLoading, setDataLoading] = useState(true)
   const [filter, setFilter] = useState(searchParams.get('filter') || 'all')
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<'newest'|'visit'>('newest')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
@@ -64,6 +65,14 @@ function CustomersContent() {
     if (filter !== 'all' && c.customer_type !== filter) return false
     if (search && !c.name.includes(search) && !(c.phone || '').includes(search)) return false
     return true
+  }).sort((a, b) => {
+    if (sort === 'visit') {
+      if (!a.visit_schedule && !b.visit_schedule) return 0
+      if (!a.visit_schedule) return 1
+      if (!b.visit_schedule) return -1
+      return new Date(a.visit_schedule).getTime() - new Date(b.visit_schedule).getTime()
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
   if (loading || !user) return (
@@ -120,9 +129,19 @@ function CustomersContent() {
           ))}
         </div>
 
-        {/* 건수 표시 */}
+        {/* 건수 + 정렬 */}
         {!dataLoading && (
-          <p className="text-xs text-slate-400 mb-3">{filtered.length}명</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-slate-400">{filtered.length}명</p>
+            <div className="flex gap-1">
+              {([{key:'newest',label:'최신순'},{key:'visit',label:'답사일순'}] as const).map(s => (
+                <button key={s.key} onClick={() => setSort(s.key)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${sort === s.key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* 고객 목록 */}
@@ -135,35 +154,51 @@ function CustomersContent() {
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <span className="text-4xl">👤</span>
             <p className="text-sm font-medium text-slate-500 mt-1">고객이 없습니다</p>
-            <p className="text-xs text-slate-400">새 고객을 등록해보세요</p>
+            {search || filter !== 'all' ? (
+              <p className="text-xs text-slate-400">검색 조건을 바꿔보세요</p>
+            ) : (
+              <Link href="/customers/new" className="mt-1 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl hover:bg-indigo-100 transition">
+                + 첫 고객 등록
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-2.5">
             {filtered.map(c => {
               const typeConf = TYPE_CONFIG[c.customer_type] || { icon: '👤', color: 'text-slate-600', bg: 'bg-slate-50' }
               return (
-                <Link key={c.id} href={`/customers/${c.id}`}
-                  className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-3.5 hover:border-indigo-200 hover:shadow-indigo-50 transition-all active:opacity-80">
+                <div key={c.id} onClick={() => router.push(`/customers/${c.id}`)}
+                  className={`flex items-center gap-3 bg-white rounded-2xl border shadow-sm px-4 py-3.5 transition-all active:opacity-80 cursor-pointer ${
+                    c.is_risky ? 'border-rose-200 hover:border-rose-300' : 'border-slate-100 hover:border-indigo-200'
+                  }`}>
                   {/* 타입 아이콘 */}
                   <div className={`w-10 h-10 ${typeConf.bg} rounded-xl flex items-center justify-center text-lg flex-shrink-0`}>
                     {typeConf.icon}
                   </div>
                   {/* 정보 */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="font-bold text-slate-900 text-sm">{c.name}</p>
+                      {c.is_risky && <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">위험</span>}
                       {c.assigned_sales_name && (
                         <span className="text-xs text-slate-400 truncate">· {c.assigned_sales_name}</span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">{c.phone || '연락처 없음'}</p>
+                    {c.phone ? (
+                      <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()}
+                        className="text-xs text-indigo-500 font-medium mt-0.5 flex items-center gap-1 w-fit">
+                        📞 {c.phone}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-0.5">연락처 없음</p>
+                    )}
                     <p className="text-xs text-slate-400 mt-0.5">{new Date(c.created_at).toLocaleDateString('ko-KR')}</p>
                   </div>
                   {/* 상태 뱃지 */}
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${STATUS_STYLES[c.status] || 'bg-slate-100 text-slate-500'}`}>
                     {c.status}
                   </span>
-                </Link>
+                </div>
               )
             })}
           </div>

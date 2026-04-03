@@ -59,6 +59,9 @@ export default function CustomerDetailPage() {
   const [saving, setSaving] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
+  const [toast, setToast] = useState('')
+
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   const EDIT_CACHE = `hanulaan_customer_edit_${params.id}`
 
@@ -136,6 +139,7 @@ export default function CustomerDetailPage() {
     }).eq('id', customer.id)
     setSaving(false)
     setEditing(false)
+    showToast('저장되었습니다')
     loadAll()
   }
 
@@ -305,7 +309,13 @@ export default function CustomerDetailPage() {
                     <span className="text-white/70 text-sm">{customer.customer_type}</span>
                   </div>
                   <h3 className="text-2xl font-bold text-white">{customer.name}</h3>
-                  <p className="text-white/70 text-sm mt-1">{customer.phone || '연락처 없음'}</p>
+                  {customer.phone ? (
+                    <a href={`tel:${customer.phone}`} className="text-white/80 text-sm mt-1 flex items-center gap-1.5 w-fit">
+                      📞 {customer.phone}
+                    </a>
+                  ) : (
+                    <p className="text-white/50 text-sm mt-1">연락처 없음</p>
+                  )}
                 </div>
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${STATUS_STYLES[customer.status] || 'bg-white/20 text-white'}`}>
                   {customer.status}
@@ -382,7 +392,7 @@ export default function CustomerDetailPage() {
 
             {/* 상태 변경 */}
             <InfoCard title="상태 변경" emoji="🔄">
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap mb-3">
                 {(['상담중', '가계약', '계약완료', '취소'] as const).map(s => (
                   <button key={s} onClick={() => updateStatus(s)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
@@ -393,6 +403,20 @@ export default function CustomerDetailPage() {
                     {s}
                   </button>
                 ))}
+              </div>
+              <div className="border-t border-slate-100 pt-3">
+                <button
+                  onClick={async () => {
+                    await supabase.from('customers').update({ is_risky: !customer.is_risky }).eq('id', customer.id)
+                    loadAll()
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    customer.is_risky
+                      ? 'bg-rose-500 text-white border-rose-500'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-rose-200 hover:text-rose-500'
+                  }`}>
+                  🚨 위험 고객 {customer.is_risky ? '(ON)' : '(OFF)'}
+                </button>
               </div>
             </InfoCard>
 
@@ -425,8 +449,18 @@ export default function CustomerDetailPage() {
                         <span className="text-sm font-bold text-slate-800">{p.product_type}</span>
                         {p.amount && <span className="text-sm font-bold text-indigo-600">{p.amount.toLocaleString()}원</span>}
                       </div>
-                      {p.funeral_date && <p className="text-xs text-slate-500 mt-1">장례일: {new Date(p.funeral_date).toLocaleDateString('ko-KR')}</p>}
-                      {p.engraving_info && <p className="text-xs text-purple-600 mt-0.5">각인: {p.engraving_info}</p>}
+                      {p.urn_name && <p className="text-xs text-purple-700 font-medium mt-1">{p.urn_name}</p>}
+                      {p.product_type === '유골함' && (
+                        p.engraving_tbd === false && (p.engraving_birth || p.engraving_death) ? (
+                          <p className="text-xs text-indigo-600 mt-0.5">
+                            {p.engraving_birth && `생 ${p.engraving_birth}(${p.engraving_birth_type || '양력'})`}
+                            {p.engraving_birth && p.engraving_death && ' / '}
+                            {p.engraving_death && `졸 ${p.engraving_death}(${p.engraving_death_type || '양력'})`}
+                          </p>
+                        ) : <p className="text-xs text-rose-400 mt-0.5">각인 미정</p>
+                      )}
+                      {p.sangjo_company && <p className="text-xs text-slate-500 mt-0.5">상조: {p.sangjo_company}</p>}
+                      {p.notes && <p className="text-xs text-slate-400 mt-0.5 truncate">{p.notes}</p>}
                     </div>
                   ))}
                 </div>
@@ -475,6 +509,11 @@ export default function CustomerDetailPage() {
           </>
         )}
       </main>
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl pointer-events-none">
+          ✓ {toast}
+        </div>
+      )}
     </div>
   )
 }

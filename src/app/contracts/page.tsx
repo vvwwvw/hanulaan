@@ -43,6 +43,9 @@ function ContractsContent() {
   const [promotingId, setPromotingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [contractSearch, setContractSearch] = useState('')
+  const [contractFilter, setContractFilter] = useState('all')
+  const [toast, setToast] = useState('')
   const [comments, setComments] = useState<Record<string, any[]>>({})
   const [newComment, setNewComment] = useState<Record<string, string>>({})
   const [postingComment, setPostingComment] = useState<string | null>(null)
@@ -129,6 +132,8 @@ function ContractsContent() {
     loadComments(contractId)
   }
 
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2500) }
+
   function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
 
   function startEdit(c: any) {
@@ -211,6 +216,7 @@ function ContractsContent() {
     setForm(defaultForm)
     loadAll()
     setSaving(false)
+    showToast('저장되었습니다')
   }
 
   function getDaysLeft(expiry: string) {
@@ -225,6 +231,11 @@ function ContractsContent() {
 
   const activeFormId = editingId || promotingId
   const formTitle = promotingId ? '본계약 전환' : editingId ? '계약 수정' : '계약 등록'
+  const filteredContracts = contracts.filter(c => {
+    if (contractFilter !== 'all' && c.contract_type !== contractFilter) return false
+    if (contractSearch && !(c.customer?.name || '').includes(contractSearch)) return false
+    return true
+  })
   const discountAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
   const totalRaw = parseInt(numRaw(form.total_amount)) || 0
   const paidRaw = parseInt(numRaw(form.paid_amount)) || 0
@@ -404,20 +415,51 @@ function ContractsContent() {
           </form>
         )}
 
+        {/* 검색 + 필터 */}
+        {!showForm && !activeFormId && (
+          <>
+            <div className="relative mb-3">
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+                <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              <input type="text" placeholder="고객명 검색" value={contractSearch} onChange={e => setContractSearch(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition" />
+            </div>
+            <div className="flex gap-2 mb-4">
+              {[{key:'all',label:'전체'},{key:'가계약',label:'📝 가계약'},{key:'본계약',label:'✅ 본계약'}].map(f => (
+                <button key={f.key} onClick={() => setContractFilter(f.key)}
+                  className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap ${contractFilter === f.key ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                  {f.label}
+                </button>
+              ))}
+              {filteredContracts.length > 0 && <span className="ml-auto text-xs text-slate-400 self-center">{filteredContracts.length}건</span>}
+            </div>
+          </>
+        )}
+
         {/* 계약 목록 */}
         {dataLoading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
             <p className="text-sm text-slate-400">불러오는 중...</p>
           </div>
-        ) : contracts.length === 0 ? (
+        ) : filteredContracts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <span className="text-4xl">📋</span>
             <p className="text-sm font-medium text-slate-500 mt-1">계약 내역이 없습니다</p>
+            {contractSearch || contractFilter !== 'all' ? (
+              <p className="text-xs text-slate-400">검색 조건을 바꿔보세요</p>
+            ) : (
+              <button onClick={() => setShowForm(true)}
+                className="mt-1 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl hover:bg-indigo-100 transition">
+                + 첫 계약 등록
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {contracts.map(c => {
+            {filteredContracts.map(c => {
               const daysLeft = c.expiry_date ? getDaysLeft(c.expiry_date) : null
               const isExpiringSoon = daysLeft !== null && daysLeft <= 3 && daysLeft >= 0
               const isExpanded = expandedId === c.id
@@ -574,6 +616,11 @@ function ContractsContent() {
           </div>
         )}
       </main>
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl pointer-events-none">
+          ✓ {toast}
+        </div>
+      )}
     </div>
   )
 }

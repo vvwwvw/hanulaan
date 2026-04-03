@@ -155,6 +155,9 @@ function ProductsContent() {
   const [showForm, setShowForm] = useState(!!searchParams.get('customer_id'))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [productSearch, setProductSearch] = useState('')
+  const [productFilter, setProductFilter] = useState('all')
+  const [toast, setToast] = useState('')
 
   const emptyForm = {
     customer_id: searchParams.get('customer_id') || '',
@@ -191,6 +194,8 @@ function ProductsContent() {
     setCustomers(cRes.data || [])
     setDataLoading(false)
   }
+
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
 
@@ -278,6 +283,7 @@ function ProductsContent() {
     setForm(emptyForm)
     loadAll()
     setSaving(false)
+    showToast('저장되었습니다')
   }
 
   if (loading || !user) return (
@@ -287,8 +293,12 @@ function ProductsContent() {
   )
 
   const showingForm = showForm || !!editingId
-  // 현재 선택된 유골함이 목록에 있는지 확인
   const isKnownUrn = URN_PRODUCTS.some(u => u.name === form.urn_name)
+  const filteredProducts = products.filter(p => {
+    if (productFilter !== 'all' && p.product_type !== productFilter) return false
+    if (productSearch && !(p.customer?.name || '').includes(productSearch)) return false
+    return true
+  })
 
   return (
     <div className="pb-20">
@@ -497,20 +507,51 @@ function ProductsContent() {
           </form>
         )}
 
+        {/* 검색 + 필터 */}
+        {!showingForm && (
+          <>
+            <div className="relative mb-3">
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+                <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              <input type="text" placeholder="고객명 검색" value={productSearch} onChange={e => setProductSearch(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition" />
+            </div>
+            <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+              {[{key:'all',label:'전체'},{key:'유골함',label:'⚱️ 유골함'},{key:'상조연계',label:'🤝 상조연계'},{key:'개장업',label:'🔄 개장업'}].map(f => (
+                <button key={f.key} onClick={() => setProductFilter(f.key)}
+                  className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap ${productFilter === f.key ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                  {f.label}
+                </button>
+              ))}
+              {filteredProducts.length > 0 && <span className="ml-auto text-xs text-slate-400 self-center shrink-0">{filteredProducts.length}건</span>}
+            </div>
+          </>
+        )}
+
         {/* 상품 목록 */}
         {dataLoading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
             <p className="text-sm text-slate-400">불러오는 중...</p>
           </div>
-        ) : products.length === 0 ? (
+        ) : filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <span className="text-4xl">📦</span>
             <p className="text-sm font-medium text-slate-500 mt-1">판매 내역이 없습니다</p>
+            {productSearch || productFilter !== 'all' ? (
+              <p className="text-xs text-slate-400">검색 조건을 바꿔보세요</p>
+            ) : (
+              <button onClick={() => setShowForm(true)}
+                className="mt-1 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl hover:bg-indigo-100 transition">
+                + 첫 상품 등록
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {products.map(p => {
+            {filteredProducts.map(p => {
               const conf = PRODUCT_CONFIG[p.product_type] || { icon: '📦', gradient: 'from-slate-400 to-slate-500', lightBg: 'bg-slate-50', textColor: 'text-slate-600' }
               const isExpanded = expandedId === p.id
               return (
@@ -608,6 +649,11 @@ function ProductsContent() {
           </div>
         )}
       </main>
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl pointer-events-none">
+          ✓ {toast}
+        </div>
+      )}
     </div>
   )
 }
