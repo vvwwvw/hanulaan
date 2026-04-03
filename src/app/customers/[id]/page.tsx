@@ -125,7 +125,11 @@ export default function CustomerDetailPage() {
     loadAll()
   }
 
-  if (loading || !user || dataLoading) return null
+  if (loading || !user || dataLoading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+    </div>
+  )
   if (!customer) return <div className="p-8 text-center text-slate-400">고객을 찾을 수 없습니다.</div>
 
   const typeConf = TYPE_CONFIG[customer.customer_type] || { icon: '👤', gradient: 'from-slate-400 to-slate-500' }
