@@ -34,7 +34,7 @@ export default function CustomersPage() {
 }
 
 function CustomersContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -48,8 +48,8 @@ function CustomersContent() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadCustomers()
-  }, [user])
+    if (sessionReady) loadCustomers()
+  }, [sessionReady])
 
   async function loadCustomers() {
     const { data } = await supabase

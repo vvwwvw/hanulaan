@@ -145,7 +145,7 @@ export default function ProductsPage() {
 }
 
 function ProductsContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -175,8 +175,8 @@ function ProductsContent() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadAll()
-  }, [user])
+    if (sessionReady) loadAll()
+  }, [sessionReady])
 
   async function loadAll() {
     const [pRes, cRes] = await Promise.all([

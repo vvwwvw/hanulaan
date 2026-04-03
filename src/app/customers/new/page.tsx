@@ -10,7 +10,7 @@ const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm tex
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 
 export default function NewCustomerPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const supabase = createClient()
   const [saving, setSaving] = useState(false)

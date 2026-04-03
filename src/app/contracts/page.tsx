@@ -14,7 +14,7 @@ export default function ContractsPage() {
 }
 
 function ContractsContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -43,8 +43,8 @@ function ContractsContent() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadAll()
-  }, [user])
+    if (sessionReady) loadAll()
+  }, [sessionReady])
 
   async function loadAll() {
     const [cRes, custRes] = await Promise.all([

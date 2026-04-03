@@ -22,7 +22,7 @@ interface ExpiringContract {
 }
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const supabase = createClient()
   const [stats, setStats] = useState<Stats>({ totalCustomers: 0, provisionalCount: 0, expiringCount: 0, funeralCount: 0 })
@@ -34,8 +34,8 @@ export default function DashboardPage() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadDashboard()
-  }, [user])
+    if (sessionReady) loadDashboard()
+  }, [sessionReady])
 
   async function loadDashboard() {
     const today = new Date().toISOString().split('T')[0]

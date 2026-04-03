@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 
 export default function NewDasaPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const supabase = createClient()
   const [saving, setSaving] = useState(false)

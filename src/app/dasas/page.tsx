@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { Dasa } from '@/lib/types'
 
 export default function DasasPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const supabase = createClient()
   const [dasas, setDasas] = useState<(Dasa & { sales?: { name: string } })[]>([])
@@ -20,8 +20,8 @@ export default function DasasPage() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadDasas()
-  }, [user])
+    if (sessionReady) loadDasas()
+  }, [sessionReady])
 
   async function loadDasas() {
     let query = supabase

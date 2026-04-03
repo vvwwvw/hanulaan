@@ -7,6 +7,7 @@ import { User } from '@/lib/types'
 interface AuthContextType {
   user: User | null
   loading: boolean
+  sessionReady: boolean  // 토큰 확인 완료 → 데이터 쿼리 가능
   signIn: (email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
 }
@@ -23,11 +24,15 @@ function loadCache(): User | null {
     return s ? JSON.parse(s) : null
   } catch { return null }
 }
-function clearCache() {
-  try { localStorage.removeItem(CACHE_KEY) } catch {}
+function clearLocalSession() {
+  try {
+    localStorage.removeItem(CACHE_KEY)
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('sb-')) localStorage.removeItem(k)
+    })
+  } catch {}
 }
 
-// localStorage에서 Supabase 세션 직접 읽기 (네트워크 요청 없음)
 function getLocalSession(): { email: string } | null {
   try {
     const key = Object.keys(localStorage).find(
@@ -51,37 +56,36 @@ async function fetchProfile(email: string): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sessionReady, setSessionReady] = useState(false)
   const initialized = useRef(false)
 
   useEffect(() => {
     let mounted = true
 
-    // ── Step 1: 네트워크 없이 localStorage만으로 즉시 복원 ──
+    // Step 1: localStorage에서 즉시 복원 (네트워크 없음)
     const localSession = getLocalSession()
     const cached = loadCache()
-
     if (localSession && cached && cached.email === localSession.email) {
-      // 세션 + 캐시 모두 있음 → 즉시 로그인 상태로
       setUser(cached)
       setLoading(false)
       initialized.current = true
-      // 백그라운드에서 프로필 갱신
-      fetchProfile(localSession.email).then(p => { if (mounted && p) setUser(p) })
+      // sessionReady는 INITIAL_SESSION 후에 true로 설정
     }
 
-    // ── Step 2: Supabase 인증 상태 변화 감지 ──
+    // Step 2: Supabase 토큰 확인 (백그라운드)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
       if (event === 'INITIAL_SESSION') {
         if (session?.user) {
-          // 세션 유효 → 프로필 갱신
+          // 토큰 유효 → 프로필 갱신 + 데이터 쿼리 허용
           const profile = await fetchProfile(session.user.email!)
           if (mounted && profile) setUser(profile)
+          if (mounted) setSessionReady(true)
         } else {
-          // 세션 없음 → 캐시 지우고 로그인으로
-          clearCache()
-          if (mounted) setUser(null)
+          // 세션 없음 → 로그아웃
+          clearLocalSession()
+          if (mounted) { setUser(null); setSessionReady(false) }
         }
         if (mounted && !initialized.current) {
           initialized.current = true
@@ -93,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const profile = await fetchProfile(session.user.email!)
           if (mounted && profile) {
             setUser(profile)
+            setSessionReady(true)
             if (!initialized.current) {
               initialized.current = true
               setLoading(false)
@@ -101,12 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
       } else if (event === 'TOKEN_REFRESHED') {
-        // 토큰 갱신됨 → 로그인 유지, 아무것도 안 해도 됨
+        if (mounted) setSessionReady(true)
 
       } else if (event === 'SIGNED_OUT') {
-        clearCache()
+        clearLocalSession()
         if (mounted) {
           setUser(null)
+          setSessionReady(false)
           setLoading(false)
         }
       }
@@ -119,26 +125,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
-    // 10초 타임아웃
     const loginPromise = supabase.auth.signInWithPassword({ email, password })
       .then(({ error }) => error?.message ?? null)
       .catch(() => '로그인 중 오류가 발생했습니다.')
-
     const timeout = new Promise<string>(resolve =>
       setTimeout(() => resolve('요청이 너무 오래 걸립니다. 다시 시도해주세요.'), 10000)
     )
-
     return Promise.race([loginPromise, timeout])
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
-    clearCache()
+    // 네트워크 없이 즉시 로컬에서 로그아웃
+    clearLocalSession()
     setUser(null)
+    setSessionReady(false)
+    // 백그라운드에서 서버 로그아웃 (실패해도 무관)
+    supabase.auth.signOut().catch(() => {})
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, sessionReady, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

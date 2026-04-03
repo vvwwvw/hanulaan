@@ -25,7 +25,7 @@ const TYPE_CONFIG: Record<string, { icon: string; gradient: string }> = {
 }
 
 export default function CustomerDetailPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
   const params = useParams()
   const supabase = createClient()
@@ -45,8 +45,8 @@ export default function CustomerDetailPage() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) loadAll()
-  }, [user])
+    if (sessionReady) loadAll()
+  }, [sessionReady])
 
   async function loadAll() {
     const id = params.id as string
