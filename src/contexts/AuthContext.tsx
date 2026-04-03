@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { User } from '@/lib/types'
 
 interface AuthContextType {
@@ -13,55 +13,47 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+async function fetchProfile(email: string): Promise<User | null> {
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .single()
+  return data as User | null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
-    // 5초 안에 안 되면 강제로 loading 해제
-    const timeout = setTimeout(() => setLoading(false), 5000)
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', session.user.email!)
-          .single()
-        if (data) setUser(data as User)
-      }
-      clearTimeout(timeout)
-      setLoading(false)
-    }).catch(() => {
-      clearTimeout(timeout)
-      setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', session.user.email!)
-          .single()
-        if (data) setUser(data as User)
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        // 앱 첫 로드 — 세션 있으면 프로필 로드
+        try {
+          if (session?.user) {
+            const profile = await fetchProfile(session.user.email!)
+            if (profile) setUser(profile)
+          }
+        } finally {
+          setLoading(false)
+        }
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.email!)
+          if (profile) setUser(profile)
+        }
+      } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
     })
 
-    return () => {
-      clearTimeout(timeout)
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return error.message
-    const { data } = await supabase.from('users').select('*').eq('email', email).single()
-    if (data) setUser(data as User)
     return null
   }
 
