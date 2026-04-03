@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@/lib/types'
 
@@ -27,59 +27,90 @@ function clearCache() {
   try { localStorage.removeItem(CACHE_KEY) } catch {}
 }
 
-// DB 쿼리에 타임아웃 적용 (5초)
 async function fetchProfile(email: string): Promise<User | null> {
-  const query = supabase.from('users').select('*').eq('email', email).single()
-    .then(({ data }) => (data ? (data as User) : null))
-    .catch(() => null)
-
-  const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 5000))
-
-  const result = await Promise.race([query, timeout])
-  if (result) saveCache(result)
-  return result
+  try {
+    const { data } = await supabase.from('users').select('*').eq('email', email).single()
+    if (data) { saveCache(data as User); return data as User }
+    return null
+  } catch { return null }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const loadingDone = useRef(false)
+
+  function finishLoading(u: User | null) {
+    if (loadingDone.current) return
+    loadingDone.current = true
+    if (u) setUser(u)
+    setLoading(false)
+  }
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    let mounted = true
 
-      if (event === 'INITIAL_SESSION') {
-        if (!session?.user) {
-          setLoading(false)
-          return
-        }
+    async function init() {
+      // 1. 캐시가 있으면 즉시 렌더 (가장 빠름)
+      const cached = loadCache()
+      if (cached) {
+        finishLoading(cached)
+      }
 
-        // 캐시 있으면 즉시 렌더 (새로고침 시 스피너 없음)
-        const cached = loadCache()
-        if (cached && cached.email === session.user.email) {
-          setUser(cached)
-          setLoading(false)
-          // 백그라운드 갱신
-          fetchProfile(session.user.email!).then(p => { if (p) setUser(p) })
-          return
-        }
+      // 2. getSession을 3초 타임아웃으로 실행
+      const session = await Promise.race([
+        supabase.auth.getSession().then(r => r.data.session).catch(() => null),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+      ])
 
-        // 캐시 없으면 DB에서 로드 (최대 5초)
+      if (!mounted) return
+
+      if (!session?.user) {
+        // 세션 없음 → 캐시 삭제 후 로그인으로
+        clearCache()
+        setUser(null)
+        finishLoading(null)
+        return
+      }
+
+      // 세션 있음 → 캐시 이메일 확인
+      if (cached && cached.email === session.user.email) {
+        finishLoading(cached)
+        // 백그라운드에서 최신 프로필 갱신
+        fetchProfile(session.user.email!).then(p => {
+          if (mounted && p) setUser(p)
+        })
+      } else {
+        // 캐시 없거나 이메일 불일치 → DB에서 로드
         const profile = await fetchProfile(session.user.email!)
-        if (profile) setUser(profile)
-        setLoading(false)
+        if (mounted) finishLoading(profile)
+      }
+    }
 
-      } else if (event === 'SIGNED_IN') {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.email!)
-          if (profile) setUser(profile)
+    init()
+
+    // 로그인/로그아웃 이벤트만 처리
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await fetchProfile(session.user.email!)
+        if (mounted && profile) {
+          setUser(profile)
+          finishLoading(profile)
         }
       } else if (event === 'SIGNED_OUT') {
         clearCache()
-        setUser(null)
+        if (mounted) {
+          setUser(null)
+          loadingDone.current = true
+          setLoading(false)
+        }
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
