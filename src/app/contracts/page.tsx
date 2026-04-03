@@ -10,6 +10,13 @@ const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm tex
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 const FORM_CACHE = 'hanulaan_contract_form'
 
+// 날짜 문자열에 n일 더하기 (YYYY-MM-DD → YYYY-MM-DD)
+function addDays(dateStr: string, n: number) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + n)
+  return dt.toISOString().split('T')[0]
+}
+
 // 숫자 → 회계 형식 (1000000 → 1,000,000)
 function numFmt(v: string) {
   const n = v.replace(/[^0-9]/g, '')
@@ -54,7 +61,7 @@ function ContractsContent() {
     customer_id: searchParams.get('customer_id') || '',
     contract_type: '가계약',
     provisional_date: new Date().toISOString().split('T')[0],
-    expiry_date: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+    expiry_date: addDays(new Date().toISOString().split('T')[0], 14),
     lot_number: '',
     total_amount: '',
     paid_amount: '',
@@ -291,7 +298,7 @@ function ContractsContent() {
                       <button key={t} type="button" onClick={() => {
                         set('contract_type', t)
                         if (t === '가계약' && form.provisional_date) {
-                          set('expiry_date', new Date(new Date(form.provisional_date).getTime() + 14 * 86400000).toISOString().split('T')[0])
+                          set('expiry_date', addDays(form.provisional_date, 14))
                         }
                       }}
                         className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
@@ -313,7 +320,7 @@ function ContractsContent() {
                     const d = e.target.value
                     set('provisional_date', d)
                     if (form.contract_type === '가계약' && d) {
-                      set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
+                      set('expiry_date', addDays(d, 14))
                     }
                   }} className={cls} />
                 </div>

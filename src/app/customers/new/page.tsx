@@ -106,10 +106,10 @@ export default function NewCustomerPage() {
   )
 
   const TYPE_OPTIONS = [
-    { value: '장례중', label: '⚰️ 장례중', color: 'bg-purple-50 border-purple-200 text-purple-700', activeColor: 'bg-purple-600 border-purple-600 text-white' },
-    { value: '위중', label: '🕯️ 위중', color: 'bg-rose-50 border-rose-200 text-rose-700', activeColor: 'bg-rose-500 border-rose-500 text-white' },
-    { value: '사전분양', label: '🏛️ 사전분양', color: 'bg-teal-50 border-teal-200 text-teal-700', activeColor: 'bg-teal-600 border-teal-600 text-white' },
-    { value: '개장이장', label: '🔄 개장이장', color: 'bg-orange-50 border-orange-200 text-orange-700', activeColor: 'bg-orange-500 border-orange-500 text-white' },
+    { value: '장례중', label: '장례중', dot: 'bg-purple-500', color: 'bg-purple-50 border-purple-200 text-purple-700', activeColor: 'bg-purple-600 border-purple-600 text-white' },
+    { value: '위중', label: '위중', dot: 'bg-rose-500', color: 'bg-rose-50 border-rose-200 text-rose-700', activeColor: 'bg-rose-500 border-rose-500 text-white' },
+    { value: '사전분양', label: '사전분양', dot: 'bg-teal-500', color: 'bg-teal-50 border-teal-200 text-teal-700', activeColor: 'bg-teal-600 border-teal-600 text-white' },
+    { value: '개장이장', label: '개장이장', dot: 'bg-orange-500', color: 'bg-orange-50 border-orange-200 text-orange-700', activeColor: 'bg-orange-500 border-orange-500 text-white' },
   ]
 
   return (
@@ -171,10 +171,11 @@ export default function NewCustomerPage() {
                     key={opt.value}
                     type="button"
                     onClick={() => set('customer_type', opt.value)}
-                    className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                    className={`py-2.5 rounded-xl text-sm font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                       form.customer_type === opt.value ? opt.activeColor : opt.color
                     }`}
                   >
+                    <span className={`w-2 h-2 rounded-full ${form.customer_type === opt.value ? 'bg-white/80' : opt.dot}`} />
                     {opt.label}
                   </button>
                 ))}

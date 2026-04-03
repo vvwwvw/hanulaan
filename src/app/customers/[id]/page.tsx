@@ -10,6 +10,12 @@ import Link from 'next/link'
 const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white transition'
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 
+function addDays(dateStr: string, n: number) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + n)
+  return dt.toISOString().split('T')[0]
+}
+
 function numFmt(v: string) {
   const n = v.replace(/[^0-9]/g, '')
   return n ? Number(n).toLocaleString('ko-KR') : ''
@@ -37,11 +43,11 @@ const STATUS_STYLES: Record<string, string> = {
   '취소': 'bg-slate-100 text-slate-500 border border-slate-200',
 }
 
-const TYPE_CONFIG: Record<string, { icon: string; gradient: string }> = {
-  '장례중': { icon: '⚰️', gradient: 'from-purple-500 to-purple-600' },
-  '위중': { icon: '🕯️', gradient: 'from-rose-400 to-rose-500' },
-  '사전분양': { icon: '🏛️', gradient: 'from-teal-500 to-teal-600' },
-  '개장이장': { icon: '🔄', gradient: 'from-orange-400 to-orange-500' },
+const TYPE_CONFIG: Record<string, { gradient: string }> = {
+  '장례중': { gradient: 'from-purple-500 to-purple-600' },
+  '위중': { gradient: 'from-rose-400 to-rose-500' },
+  '사전분양': { gradient: 'from-teal-500 to-teal-600' },
+  '개장이장': { gradient: 'from-orange-400 to-orange-500' },
 }
 
 export default function CustomerDetailPage() {
@@ -179,7 +185,7 @@ export default function CustomerDetailPage() {
   )
   if (!customer) return <div className="p-8 text-center text-slate-400">고객을 찾을 수 없습니다.</div>
 
-  const typeConf = TYPE_CONFIG[customer.customer_type] || { icon: '👤', gradient: 'from-slate-400 to-slate-500' }
+  const typeConf = TYPE_CONFIG[customer.customer_type] || { gradient: 'from-slate-400 to-slate-500' }
 
   return (
     <div className="pb-20">
@@ -228,10 +234,10 @@ export default function CustomerDetailPage() {
             <EditCard title="방문 유형" emoji="🚪">
               <Field label="고객 유형">
                 <select value={editForm.customer_type || ''} onChange={e => setEditForm((f:any) => ({...f, customer_type: e.target.value}))} className={cls}>
-                  <option value="장례중">⚰️ 장례중</option>
-                  <option value="위중">🕯️ 위중</option>
-                  <option value="사전분양">🏛️ 사전분양</option>
-                  <option value="개장이장">🔄 개장이장</option>
+                  <option value="장례중">장례중</option>
+                  <option value="위중">위중</option>
+                  <option value="사전분양">사전분양</option>
+                  <option value="개장이장">개장이장</option>
                 </select>
               </Field>
               {editForm.customer_type === '사전분양' && (
@@ -305,8 +311,7 @@ export default function CustomerDetailPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl">{typeConf.icon}</span>
-                    <span className="text-white/70 text-sm">{customer.customer_type}</span>
+                    <span className="text-white/70 text-sm font-medium">{customer.customer_type}</span>
                   </div>
                   <h3 className="text-2xl font-bold text-white">{customer.name}</h3>
                   {customer.phone ? (
@@ -332,7 +337,7 @@ export default function CustomerDetailPage() {
             {/* 기본 정보 */}
             <InfoCard title="기본 정보" emoji="📌">
               <div className="grid grid-cols-2 gap-3">
-                <InfoItem label="고객 유형" value={`${typeConf.icon} ${customer.customer_type}`} />
+                <InfoItem label="고객 유형" value={customer.customer_type} />
                 {customer.pre_sale_type && <InfoItem label="분양 대상" value={customer.pre_sale_type} />}
                 {customer.visit_schedule && <InfoItem label="답사 일정" value={new Date(customer.visit_schedule).toLocaleDateString('ko-KR')} />}
                 {customer.counselor && <InfoItem label="상담자" value={customer.counselor.name} />}
@@ -599,7 +604,7 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
             <input type="date" value={form.provisional_date} onChange={e => {
               const d = e.target.value
               set('provisional_date', d)
-              if (form.contract_type === '가계약' && d) set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
+              if (form.contract_type === '가계약' && d) set('expiry_date', addDays(d, 14))
             }} className={cls2} />
           </div>
           {form.contract_type === '가계약' && (
