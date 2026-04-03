@@ -12,31 +12,32 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
-
 const CACHE_KEY = 'hanulaan_user'
 
-function saveCache(user: User) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(user)) } catch {}
+function saveCache(u: User) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(u)) } catch {}
 }
-
 function loadCache(): User | null {
   try {
     const s = localStorage.getItem(CACHE_KEY)
     return s ? JSON.parse(s) : null
   } catch { return null }
 }
-
 function clearCache() {
   try { localStorage.removeItem(CACHE_KEY) } catch {}
 }
 
+// DB 쿼리에 타임아웃 적용 (5초)
 async function fetchProfile(email: string): Promise<User | null> {
-  const { data } = await supabase.from('users').select('*').eq('email', email).single()
-  if (data) {
-    saveCache(data as User)
-    return data as User
-  }
-  return null
+  const query = supabase.from('users').select('*').eq('email', email).single()
+    .then(({ data }) => (data ? (data as User) : null))
+    .catch(() => null)
+
+  const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 5000))
+
+  const result = await Promise.race([query, timeout])
+  if (result) saveCache(result)
+  return result
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -45,29 +46,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+
       if (event === 'INITIAL_SESSION') {
         if (!session?.user) {
-          // 세션 없음 → 로그인 필요
           setLoading(false)
           return
         }
 
-        // 캐시된 프로필 있으면 즉시 로드 (새로고침 시 빠른 렌더)
+        // 캐시 있으면 즉시 렌더 (새로고침 시 스피너 없음)
         const cached = loadCache()
         if (cached && cached.email === session.user.email) {
           setUser(cached)
           setLoading(false)
-          // 백그라운드에서 최신 프로필로 갱신
+          // 백그라운드 갱신
           fetchProfile(session.user.email!).then(p => { if (p) setUser(p) })
-        } else {
-          // 캐시 없으면 DB에서 로드
-          try {
-            const profile = await fetchProfile(session.user.email!)
-            if (profile) setUser(profile)
-          } finally {
-            setLoading(false)
-          }
+          return
         }
+
+        // 캐시 없으면 DB에서 로드 (최대 5초)
+        const profile = await fetchProfile(session.user.email!)
+        if (profile) setUser(profile)
+        setLoading(false)
 
       } else if (event === 'SIGNED_IN') {
         if (session?.user) {
