@@ -88,7 +88,7 @@ function ContractsContent() {
       setEditingId(null)
     } else if (promotingId) {
       const orig = contracts.find(c => c.id === promotingId)
-      const historyText = `[가계약 이력] 계약일: ${orig.provisional_date || '-'} / 만료일: ${orig.expiry_date || '-'} / 호수: ${orig.lot_number || '-'} / 금액: ${orig.total_amount ? orig.total_amount.toLocaleString() + '원' : '-'} / 납부: ${orig.paid_amount ? orig.paid_amount.toLocaleString() + '원' : '-'} / 메모: ${orig.notes || '-'}`
+      const historyText = `[가계약 이력] 계약일: ${orig.provisional_date || '-'} / 만료일: ${orig.expiry_date || '-'} / 호수: ${orig.lot_number || '-'} / 금액: ${orig.total_amount ? orig.total_amount.toLocaleString() + '원' : '-'} / 계약금: ${orig.paid_amount ? orig.paid_amount.toLocaleString() + '원' : '-'} / 메모: ${orig.notes || '-'}`
       await supabase.from('contracts').update({ contract_type: '본계약', provisional_date: form.provisional_date || null, expiry_date: null, lot_number: form.lot_number || null, total_amount: form.total_amount ? parseInt(form.total_amount) : null, paid_amount: form.paid_amount ? parseInt(form.paid_amount) : 0, notes: form.notes || null, history: historyText, is_completed: true }).eq('id', promotingId)
       await supabase.from('customers').update({ status: '계약완료' }).eq('id', form.customer_id)
       const cust = customers.find(c => c.id === form.customer_id)
@@ -172,7 +172,12 @@ function ContractsContent() {
                   <label className={lbl}>계약 유형</label>
                   <div className="flex gap-2">
                     {['가계약', '본계약'].map(t => (
-                      <button key={t} type="button" onClick={() => set('contract_type', t)}
+                      <button key={t} type="button" onClick={() => {
+                        set('contract_type', t)
+                        if (t === '가계약' && form.provisional_date) {
+                          set('expiry_date', new Date(new Date(form.provisional_date).getTime() + 14 * 86400000).toISOString().split('T')[0])
+                        }
+                      }}
                         className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
                           form.contract_type === t
                             ? t === '본계약' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-amber-500 text-white border-amber-500'
@@ -188,11 +193,17 @@ function ContractsContent() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={lbl}>계약일</label>
-                  <input type="date" value={form.provisional_date} onChange={e => set('provisional_date', e.target.value)} className={cls} />
+                  <input type="date" value={form.provisional_date} onChange={e => {
+                    const d = e.target.value
+                    set('provisional_date', d)
+                    if (form.contract_type === '가계약' && d) {
+                      set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
+                    }
+                  }} className={cls} />
                 </div>
                 {form.contract_type === '가계약' && (
                   <div>
-                    <label className={lbl}>만료일</label>
+                    <label className={lbl}>만료일 (자동 +2주)</label>
                     <input type="date" value={form.expiry_date} onChange={e => set('expiry_date', e.target.value)} className={cls} />
                   </div>
                 )}
@@ -209,7 +220,7 @@ function ContractsContent() {
                   <input type="number" value={form.total_amount} onChange={e => set('total_amount', e.target.value)} className={cls} placeholder="3000000" />
                 </div>
                 <div>
-                  <label className={lbl}>납부금액 (원)</label>
+                  <label className={lbl}>계약금 (원)</label>
                   <input type="number" value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} className={cls} placeholder="300000" />
                 </div>
               </div>

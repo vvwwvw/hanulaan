@@ -9,6 +9,13 @@ import Navbar from '@/components/Navbar'
 const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white transition'
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 
+function formatPhone(v: string) {
+  const n = v.replace(/[^0-9]/g, '')
+  if (n.length <= 3) return n
+  if (n.length <= 7) return `${n.slice(0, 3)}-${n.slice(3)}`
+  return `${n.slice(0, 3)}-${n.slice(3, 7)}-${n.slice(7, 11)}`
+}
+
 export default function NewCustomerPage() {
   const { user, loading, sessionReady } = useAuth()
   const router = useRouter()
@@ -28,6 +35,7 @@ export default function NewCustomerPage() {
     contract_year: '',
     deceased_name: '',
     funeral_home: '',
+    funeral_tbd: true,
     has_sangjo: false,
     sangjo_company: '',
     called_us: false,
@@ -61,7 +69,8 @@ export default function NewCustomerPage() {
       relative_anchidan: form.has_relative ? form.relative_anchidan || null : null,
       contract_year: form.has_relative ? form.contract_year || null : null,
       deceased_name: form.customer_type === '장례중' ? form.deceased_name || null : null,
-      funeral_home: form.customer_type === '장례중' ? form.funeral_home || null : null,
+      funeral_home: form.customer_type === '장례중' ? form.funeral_home || null :
+                   form.customer_type === '위중' ? (form.funeral_tbd ? '미정' : form.funeral_home || null) : null,
       has_sangjo: ['장례중', '위중'].includes(form.customer_type) ? form.has_sangjo : null,
       sangjo_company: form.has_sangjo ? form.sangjo_company || null : null,
       called_us: form.customer_type === '장례중' ? form.called_us : null,
@@ -124,7 +133,7 @@ export default function NewCustomerPage() {
               <input required value={form.name} onChange={e => set('name', e.target.value)} className={cls} placeholder="이름 입력" />
             </Field>
             <Field label="연락처">
-              <input value={form.phone} onChange={e => set('phone', e.target.value)} className={cls} placeholder="010-0000-0000" />
+              <input value={form.phone} onChange={e => set('phone', formatPhone(e.target.value))} className={cls} placeholder="010-0000-0000" inputMode="numeric" />
             </Field>
             <Field label="거주지">
               <input value={form.address} onChange={e => set('address', e.target.value)} className={cls} placeholder="주소 입력" />
@@ -205,6 +214,22 @@ export default function NewCustomerPage() {
           {/* 위중 확인사항 */}
           {form.customer_type === '위중' && (
             <Card title="위중 확인사항" emoji="🕯️">
+              <Field label="장례 예정일">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => set('funeral_tbd', !form.funeral_tbd)}
+                    className={`shrink-0 px-3.5 py-2.5 rounded-xl text-sm font-bold border transition-all ${form.funeral_tbd ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-500 border-slate-200'}`}
+                  >
+                    미정
+                  </button>
+                  {!form.funeral_tbd ? (
+                    <input type="date" value={form.funeral_home} onChange={e => set('funeral_home', e.target.value)} className={cls} />
+                  ) : (
+                    <div className={cls + ' text-slate-400 flex items-center'}>장례 일정 미정</div>
+                  )}
+                </div>
+              </Field>
               <CheckField label="상조 가입 여부" checked={form.has_sangjo} onChange={v => set('has_sangjo', v)} />
               {form.has_sangjo && (
                 <Field label="상조 업체명">

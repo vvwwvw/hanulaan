@@ -10,6 +10,13 @@ import Link from 'next/link'
 const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white transition'
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 
+function formatPhone(v: string) {
+  const n = v.replace(/[^0-9]/g, '')
+  if (n.length <= 3) return n
+  if (n.length <= 7) return `${n.slice(0, 3)}-${n.slice(3)}`
+  return `${n.slice(0, 3)}-${n.slice(3, 7)}-${n.slice(7, 11)}`
+}
+
 const STATUS_STYLES: Record<string, string> = {
   '상담중': 'bg-blue-50 text-blue-600 border border-blue-100',
   '가계약': 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -64,7 +71,12 @@ export default function CustomerDetailPage() {
   }
 
   function startEdit() {
-    setEditForm({ ...customer, visit_schedule: customer.visit_schedule ? customer.visit_schedule.split('T')[0] : '' })
+    setEditForm({
+      ...customer,
+      visit_schedule: customer.visit_schedule ? customer.visit_schedule.split('T')[0] : '',
+      funeral_tbd: customer.customer_type === '위중' ? (customer.funeral_home === '미정' || !customer.funeral_home) : false,
+      funeral_home: customer.customer_type === '위중' && customer.funeral_home !== '미정' ? customer.funeral_home || '' : '',
+    })
     setEditing(true)
   }
 
@@ -163,7 +175,7 @@ export default function CustomerDetailPage() {
           <div className="space-y-3">
             <EditCard title="기본 정보" emoji="👤">
               <Field label="고객명 *"><input value={editForm.name || ''} onChange={e => setEditForm((f:any) => ({...f, name: e.target.value}))} className={cls} /></Field>
-              <Field label="연락처"><input value={editForm.phone || ''} onChange={e => setEditForm((f:any) => ({...f, phone: e.target.value}))} className={cls} placeholder="010-0000-0000" /></Field>
+              <Field label="연락처"><input value={editForm.phone || ''} onChange={e => setEditForm((f:any) => ({...f, phone: formatPhone(e.target.value)}))} className={cls} placeholder="010-0000-0000" inputMode="numeric" /></Field>
               <Field label="거주지"><input value={editForm.address || ''} onChange={e => setEditForm((f:any) => ({...f, address: e.target.value}))} className={cls} /></Field>
               <Field label="답사 일정"><input type="date" value={editForm.visit_schedule || ''} onChange={e => setEditForm((f:any) => ({...f, visit_schedule: e.target.value}))} className={cls} /></Field>
               <CheckField label="연고자 있음" checked={!!editForm.has_relative} onChange={v => setEditForm((f:any) => ({...f, has_relative: v}))} />
@@ -211,6 +223,22 @@ export default function CustomerDetailPage() {
 
             {editForm.customer_type === '위중' && (
               <EditCard title="위중 확인사항" emoji="🕯️">
+                <Field label="장례 예정일">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditForm((f:any) => ({...f, funeral_tbd: !f.funeral_tbd, funeral_home: !f.funeral_tbd ? '' : f.funeral_home}))}
+                      className={`shrink-0 px-3.5 py-2.5 rounded-xl text-sm font-bold border transition-all ${editForm.funeral_tbd ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-500 border-slate-200'}`}
+                    >
+                      미정
+                    </button>
+                    {!editForm.funeral_tbd ? (
+                      <input type="date" value={editForm.funeral_home || ''} onChange={e => setEditForm((f:any) => ({...f, funeral_home: e.target.value}))} className={cls} />
+                    ) : (
+                      <div className={cls + ' text-slate-400 flex items-center'}>장례 일정 미정</div>
+                    )}
+                  </div>
+                </Field>
                 <CheckField label="상조 가입 여부" checked={!!editForm.has_sangjo} onChange={v => setEditForm((f:any) => ({...f, has_sangjo: v}))} />
                 {editForm.has_sangjo && <Field label="상조 업체명"><input value={editForm.sangjo_company || ''} onChange={e => setEditForm((f:any) => ({...f, sangjo_company: e.target.value}))} className={cls} /></Field>}
               </EditCard>
@@ -301,10 +329,11 @@ export default function CustomerDetailPage() {
             )}
 
             {/* 위중 */}
-            {customer.customer_type === '위중' && customer.has_sangjo !== null && (
+            {customer.customer_type === '위중' && (
               <InfoCard title="위중 확인사항" emoji="🕯️">
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoItem label="상조" value={customer.has_sangjo ? '있음' : '없음'} />
+                  <InfoItem label="장례 예정일" value={customer.funeral_home || '미정'} />
+                  {customer.has_sangjo !== null && <InfoItem label="상조" value={customer.has_sangjo ? '있음' : '없음'} />}
                   {customer.sangjo_company && <InfoItem label="상조 업체" value={customer.sangjo_company} />}
                 </div>
               </InfoCard>
@@ -465,13 +494,17 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div><label className="text-xs text-slate-500 font-semibold block mb-1">계약일</label><input type="date" value={form.provisional_date} onChange={e => set('provisional_date', e.target.value)} className={cls2} /></div>
-          {form.contract_type === '가계약' && <div><label className="text-xs text-slate-500 font-semibold block mb-1">만료일</label><input type="date" value={form.expiry_date} onChange={e => set('expiry_date', e.target.value)} className={cls2} /></div>}
+          <div><label className="text-xs text-slate-500 font-semibold block mb-1">계약일</label><input type="date" value={form.provisional_date} onChange={e => {
+            const d = e.target.value
+            set('provisional_date', d)
+            if (form.contract_type === '가계약' && d) set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
+          }} className={cls2} /></div>
+          {form.contract_type === '가계약' && <div><label className="text-xs text-slate-500 font-semibold block mb-1">만료일 (자동 +2주)</label><input type="date" value={form.expiry_date} onChange={e => set('expiry_date', e.target.value)} className={cls2} /></div>}
         </div>
         <input value={form.lot_number} onChange={e => set('lot_number', e.target.value)} className={cls2} placeholder="호수" />
         <div className="grid grid-cols-2 gap-2">
           <input type="number" value={form.total_amount} onChange={e => set('total_amount', e.target.value)} className={cls2} placeholder="분양금액" />
-          <input type="number" value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} className={cls2} placeholder="납부금액" />
+          <input type="number" value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} className={cls2} placeholder="계약금" />
         </div>
         <input value={form.notes} onChange={e => set('notes', e.target.value)} className={cls2} placeholder="메모" />
         <div className="flex gap-2">
@@ -498,7 +531,7 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
       {c.total_amount && (
         <div className="mb-2">
           <div className="flex justify-between text-xs text-slate-500 mb-1">
-            <span>납부 {(c.paid_amount || 0).toLocaleString()}원</span>
+            <span>계약금 {(c.paid_amount || 0).toLocaleString()}원</span>
             <span>{c.total_amount.toLocaleString()}원 ({paidPct}%)</span>
           </div>
           <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
