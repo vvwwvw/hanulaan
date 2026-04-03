@@ -19,31 +19,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = createClient()
 
   useEffect(() => {
+    // 5초 안에 안 되면 강제로 loading 해제
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        // 재시도 로직: 최대 3번 시도
-        let profile = null
-        for (let i = 0; i < 3; i++) {
-          const { data } = await supabase.from('users').select('*').eq('email', session.user.email!).single()
-          if (data) { profile = data; break }
-          await new Promise(r => setTimeout(r, 500))
-        }
-        if (profile) setUser(profile as User)
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email!)
+          .single()
+        if (data) setUser(data as User)
       }
+      clearTimeout(timeout)
       setLoading(false)
     }).catch(() => {
+      clearTimeout(timeout)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const { data } = await supabase.from('users').select('*').eq('email', session.user.email!).single()
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email!)
+          .single()
         if (data) setUser(data as User)
       } else {
         setUser(null)
       }
     })
-    return () => subscription.unsubscribe()
+
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
