@@ -24,6 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadUserProfile(session.user.email!)
       }
       setLoading(false)
+    }).catch(() => {
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -37,8 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function loadUserProfile(email: string) {
-    const { data } = await supabase.from('users').select('*').eq('email', email).single()
-    if (data) setUser(data as User)
+    try {
+      const { data } = await supabase.from('users').select('*').eq('email', email).single()
+      if (data) setUser(data as User)
+    } catch {
+      // 프로필 로드 실패 시 무시 (loading false로 전환되면 로그인으로 리다이렉트됨)
+    }
   }
 
   async function signIn(email: string, password: string): Promise<string | null> {
