@@ -66,8 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return
 
       if (!session?.user) {
-        // 세션 없음 → 캐시 삭제 후 로그인으로
+        // 세션 없음 또는 타임아웃 → stale 세션 데이터 강제 삭제
         clearCache()
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key)
+          })
+        } catch {}
         setUser(null)
         finishLoading(null)
         return
