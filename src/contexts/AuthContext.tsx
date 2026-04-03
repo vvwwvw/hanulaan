@@ -25,12 +25,7 @@ function loadCache(): User | null {
   } catch { return null }
 }
 function clearLocalSession() {
-  try {
-    localStorage.removeItem(CACHE_KEY)
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('sb-')) localStorage.removeItem(k)
-    })
-  } catch {}
+  try { localStorage.removeItem(CACHE_KEY) } catch {}
 }
 
 function getLocalSession(): { email: string } | null {
@@ -135,12 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    // 네트워크 없이 즉시 로컬에서 로그아웃
     clearLocalSession()
     setUser(null)
     setSessionReady(false)
-    // 백그라운드에서 서버 로그아웃 (실패해도 무관)
-    supabase.auth.signOut().catch(() => {})
+    await supabase.auth.signOut()
   }
 
   return (
