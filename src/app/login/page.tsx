@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) router.replace('/')
-  }, [user])
+  }, [user, loading])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -24,8 +24,6 @@ export default function LoginPage() {
     if (err) {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.')
       setLoading(false)
-    } else {
-      router.replace('/')
     }
   }
 
