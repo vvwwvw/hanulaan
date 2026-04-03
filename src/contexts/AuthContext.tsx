@@ -27,6 +27,19 @@ function clearCache() {
   try { localStorage.removeItem(CACHE_KEY) } catch {}
 }
 
+// localStorage에서 Supabase 세션 직접 읽기 (네트워크 요청 없음)
+function getLocalSession(): { email: string } | null {
+  try {
+    const key = Object.keys(localStorage).find(
+      k => k.startsWith('sb-') && k.endsWith('-auth-token')
+    )
+    if (!key) return null
+    const data = JSON.parse(localStorage.getItem(key) || 'null')
+    const email = data?.user?.email
+    return email ? { email } : null
+  } catch { return null }
+}
+
 async function fetchProfile(email: string): Promise<User | null> {
   try {
     const { data } = await supabase.from('users').select('*').eq('email', email).single()
@@ -38,75 +51,62 @@ async function fetchProfile(email: string): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const loadingDone = useRef(false)
-
-  function finishLoading(u: User | null) {
-    if (loadingDone.current) return
-    loadingDone.current = true
-    if (u) setUser(u)
-    setLoading(false)
-  }
+  const initialized = useRef(false)
 
   useEffect(() => {
     let mounted = true
 
-    async function init() {
-      // 1. 캐시가 있으면 즉시 렌더 (가장 빠름)
-      const cached = loadCache()
-      if (cached) {
-        finishLoading(cached)
-      }
+    // ── Step 1: 네트워크 없이 localStorage만으로 즉시 복원 ──
+    const localSession = getLocalSession()
+    const cached = loadCache()
 
-      // 2. getSession을 3초 타임아웃으로 실행
-      const session = await Promise.race([
-        supabase.auth.getSession().then(r => r.data.session).catch(() => null),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
-      ])
-
-      if (!mounted) return
-
-      if (!session?.user) {
-        // 세션 없음 또는 타임아웃 → stale 세션 데이터 강제 삭제
-        clearCache()
-        try {
-          Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('sb-')) localStorage.removeItem(key)
-          })
-        } catch {}
-        setUser(null)
-        finishLoading(null)
-        return
-      }
-
-      // 세션 있음 → 캐시 이메일 확인
-      if (cached && cached.email === session.user.email) {
-        finishLoading(cached)
-        // 백그라운드에서 최신 프로필 갱신
-        fetchProfile(session.user.email!).then(p => {
-          if (mounted && p) setUser(p)
-        })
-      } else {
-        // 캐시 없거나 이메일 불일치 → DB에서 로드
-        const profile = await fetchProfile(session.user.email!)
-        if (mounted) finishLoading(profile)
-      }
+    if (localSession && cached && cached.email === localSession.email) {
+      // 세션 + 캐시 모두 있음 → 즉시 로그인 상태로
+      setUser(cached)
+      setLoading(false)
+      initialized.current = true
+      // 백그라운드에서 프로필 갱신
+      fetchProfile(localSession.email).then(p => { if (mounted && p) setUser(p) })
     }
 
-    init()
-
-    // 로그인/로그아웃 이벤트만 처리
+    // ── Step 2: Supabase 인증 상태 변화 감지 ──
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchProfile(session.user.email!)
-        if (mounted && profile) {
-          setUser(profile)
-          finishLoading(profile)
+      if (!mounted) return
+
+      if (event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          // 세션 유효 → 프로필 갱신
+          const profile = await fetchProfile(session.user.email!)
+          if (mounted && profile) setUser(profile)
+        } else {
+          // 세션 없음 → 캐시 지우고 로그인으로
+          clearCache()
+          if (mounted) setUser(null)
         }
+        if (mounted && !initialized.current) {
+          initialized.current = true
+          setLoading(false)
+        }
+
+      } else if (event === 'SIGNED_IN') {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.email!)
+          if (mounted && profile) {
+            setUser(profile)
+            if (!initialized.current) {
+              initialized.current = true
+              setLoading(false)
+            }
+          }
+        }
+
+      } else if (event === 'TOKEN_REFRESHED') {
+        // 토큰 갱신됨 → 로그인 유지, 아무것도 안 해도 됨
+
       } else if (event === 'SIGNED_OUT') {
         clearCache()
         if (mounted) {
           setUser(null)
-          loadingDone.current = true
           setLoading(false)
         }
       }
@@ -119,9 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return error.message
-    return null
+    // 10초 타임아웃
+    const loginPromise = supabase.auth.signInWithPassword({ email, password })
+      .then(({ error }) => error?.message ?? null)
+      .catch(() => '로그인 중 오류가 발생했습니다.')
+
+    const timeout = new Promise<string>(resolve =>
+      setTimeout(() => resolve('요청이 너무 오래 걸립니다. 다시 시도해주세요.'), 10000)
+    )
+
+    return Promise.race([loginPromise, timeout])
   }
 
   async function signOut() {
