@@ -10,6 +10,19 @@ import Link from 'next/link'
 const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white transition'
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 
+function numFmt(v: string) {
+  const n = v.replace(/[^0-9]/g, '')
+  return n ? Number(n).toLocaleString('ko-KR') : ''
+}
+function numRaw(v: string) { return v.replace(/[^0-9]/g, '') }
+function calcDiscount(total: string, dtype: string, dvalue: string): number {
+  const t = parseInt(numRaw(total)) || 0
+  const d = parseFloat(dvalue) || 0
+  if (!dtype || !d) return 0
+  if (dtype === 'rate') return Math.round(t * d / 100)
+  return d
+}
+
 function formatPhone(v: string) {
   const n = v.replace(/[^0-9]/g, '')
   if (n.length <= 3) return n
@@ -47,6 +60,23 @@ export default function CustomerDetailPage() {
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
 
+  const EDIT_CACHE = `hanulaan_customer_edit_${params.id}`
+
+  // 앱 전환 후 복귀 시 수정 폼 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(EDIT_CACHE as string)
+      if (saved) { setEditForm(JSON.parse(saved)); setEditing(true) }
+    } catch {}
+  }, [])
+
+  // 수정 폼 변경 시 자동 저장
+  useEffect(() => {
+    if (editing && Object.keys(editForm).length > 0) {
+      try { localStorage.setItem(EDIT_CACHE as string, JSON.stringify(editForm)) } catch {}
+    }
+  }, [editForm, editing])
+
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
   }, [user, loading])
@@ -82,6 +112,7 @@ export default function CustomerDetailPage() {
 
   async function saveEdit() {
     setSaving(true)
+    try { localStorage.removeItem(EDIT_CACHE as string) } catch {}
     await supabase.from('customers').update({
       name: editForm.name,
       phone: editForm.phone || null,
@@ -255,7 +286,7 @@ export default function CustomerDetailPage() {
                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-bold text-sm disabled:opacity-50 transition-colors">
                 {saving ? '저장 중...' : '저장'}
               </button>
-              <button onClick={() => setEditing(false)}
+              <button onClick={() => { setEditing(false); try { localStorage.removeItem(EDIT_CACHE as string) } catch {} }}
                 className="flex-1 bg-slate-100 text-slate-700 hover:bg-slate-200 py-3.5 rounded-2xl text-sm font-semibold transition-colors">
                 취소
               </button>
@@ -448,39 +479,69 @@ export default function CustomerDetailPage() {
   )
 }
 
+const ITEM_CACHE_PREFIX = 'hanulaan_contract_item_'
+
 function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave: () => void; supabase: any }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
+  const initForm = {
     contract_type: c.contract_type,
     provisional_date: c.provisional_date || '',
     expiry_date: c.expiry_date || '',
     lot_number: c.lot_number || '',
     total_amount: c.total_amount ? String(c.total_amount) : '',
     paid_amount: c.paid_amount ? String(c.paid_amount) : '',
+    discount_type: c.discount_type || '',
+    discount_value: c.discount_value ? String(c.discount_value) : '',
     notes: c.notes || '',
-  })
+  }
+  const [form, setForm] = useState(initForm)
+
+  // 수정 시작 시 localStorage에서 복원
+  function startEditing() {
+    try {
+      const saved = localStorage.getItem(ITEM_CACHE_PREFIX + c.id)
+      if (saved) setForm(JSON.parse(saved))
+      else setForm(initForm)
+    } catch { setForm(initForm) }
+    setEditing(true)
+  }
+
+  // 폼 변경 시 자동 저장
+  useEffect(() => {
+    if (editing) {
+      try { localStorage.setItem(ITEM_CACHE_PREFIX + c.id, JSON.stringify(form)) } catch {}
+    }
+  }, [form, editing])
 
   function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
 
   async function handleSave() {
     setSaving(true)
+    const discAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
     await supabase.from('contracts').update({
       contract_type: form.contract_type,
       provisional_date: form.provisional_date || null,
       expiry_date: form.contract_type === '가계약' ? form.expiry_date || null : null,
       lot_number: form.lot_number || null,
-      total_amount: form.total_amount ? parseInt(form.total_amount) : null,
-      paid_amount: form.paid_amount ? parseInt(form.paid_amount) : 0,
+      total_amount: form.total_amount ? parseInt(numRaw(form.total_amount)) : null,
+      paid_amount: form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0,
+      discount_type: form.discount_type || null,
+      discount_value: form.discount_value ? parseFloat(form.discount_value) : null,
+      discount_amount: discAmt || null,
       notes: form.notes || null,
       is_completed: form.contract_type === '본계약',
     }).eq('id', c.id)
+    try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {}
     setSaving(false)
     setEditing(false)
     onSave()
   }
 
-  const cls2 = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition'
+  const cls2 = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition'
+  const discAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
+  const totalRaw = parseInt(numRaw(form.total_amount)) || 0
+  const paidRaw = parseInt(numRaw(form.paid_amount)) || 0
 
   if (editing) {
     return (
@@ -494,28 +555,75 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div><label className="text-xs text-slate-500 font-semibold block mb-1">계약일</label><input type="date" value={form.provisional_date} onChange={e => {
-            const d = e.target.value
-            set('provisional_date', d)
-            if (form.contract_type === '가계약' && d) set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
-          }} className={cls2} /></div>
-          {form.contract_type === '가계약' && <div><label className="text-xs text-slate-500 font-semibold block mb-1">만료일 (자동 +2주)</label><input type="date" value={form.expiry_date} onChange={e => set('expiry_date', e.target.value)} className={cls2} /></div>}
+          <div>
+            <label className="text-xs text-slate-500 font-semibold block mb-1">계약일</label>
+            <input type="date" value={form.provisional_date} onChange={e => {
+              const d = e.target.value
+              set('provisional_date', d)
+              if (form.contract_type === '가계약' && d) set('expiry_date', new Date(new Date(d).getTime() + 14 * 86400000).toISOString().split('T')[0])
+            }} className={cls2} />
+          </div>
+          {form.contract_type === '가계약' && (
+            <div>
+              <label className="text-xs text-slate-500 font-semibold block mb-1">만료일</label>
+              <input type="date" value={form.expiry_date} onChange={e => set('expiry_date', e.target.value)} className={cls2} />
+            </div>
+          )}
         </div>
-        <input value={form.lot_number} onChange={e => set('lot_number', e.target.value)} className={cls2} placeholder="호수" />
+        <input value={form.lot_number} onChange={e => set('lot_number', e.target.value)} className={cls2} placeholder="안치단" />
         <div className="grid grid-cols-2 gap-2">
-          <input type="number" value={form.total_amount} onChange={e => set('total_amount', e.target.value)} className={cls2} placeholder="분양금액" />
-          <input type="number" value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} className={cls2} placeholder="계약금" />
+          <input inputMode="numeric" value={numFmt(form.total_amount)} onChange={e => set('total_amount', numRaw(e.target.value))} className={cls2} placeholder="분양금액" />
+          <input inputMode="numeric" value={numFmt(form.paid_amount)} onChange={e => set('paid_amount', numRaw(e.target.value))} className={cls2} placeholder="계약금" />
         </div>
+        {/* 할인 */}
+        <div>
+          <label className="text-xs text-slate-500 font-semibold block mb-1">할인</label>
+          <div className="flex gap-2">
+            <div className="flex gap-1 shrink-0">
+              {['', 'rate', 'amount'].map(t => (
+                <button key={t} type="button" onClick={() => { set('discount_type', t); set('discount_value', '') }}
+                  className={`px-2.5 py-2 rounded-xl text-xs font-bold border transition ${form.discount_type === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+                  {t === '' ? '없음' : t === 'rate' ? '%' : '원'}
+                </button>
+              ))}
+            </div>
+            {form.discount_type && (
+              <div className="relative flex-1">
+                <input
+                  inputMode="numeric"
+                  value={form.discount_type === 'rate' ? form.discount_value : numFmt(form.discount_value)}
+                  onChange={e => set('discount_value', form.discount_type === 'rate' ? e.target.value.replace(/[^0-9.]/g, '') : numRaw(e.target.value))}
+                  className={cls2}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">
+                  {form.discount_type === 'rate' ? '%' : '원'}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* 잔금 미리보기 */}
+        {totalRaw > 0 && (
+          <div className="bg-white rounded-xl p-2.5 border border-slate-200 space-y-1">
+            <FinRow2 label="분양금" value={totalRaw} />
+            {discAmt > 0 && <FinRow2 label="할인" value={-discAmt} color="text-indigo-600" />}
+            {paidRaw > 0 && <FinRow2 label="계약금" value={-paidRaw} color="text-amber-600" />}
+            <div className="border-t border-slate-100 pt-1">
+              <FinRow2 label="잔금" value={totalRaw - discAmt - paidRaw} color={(totalRaw - discAmt - paidRaw) <= 0 ? 'text-emerald-600' : 'text-rose-600'} bold />
+            </div>
+          </div>
+        )}
         <input value={form.notes} onChange={e => set('notes', e.target.value)} className={cls2} placeholder="메모" />
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold disabled:opacity-50">{saving ? '저장중...' : '저장'}</button>
-          <button onClick={() => setEditing(false)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-semibold">취소</button>
+          <button onClick={() => { setEditing(false); try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {} }} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-semibold">취소</button>
         </div>
       </div>
     )
   }
 
-  const paidPct = c.total_amount ? Math.min(100, Math.round(((c.paid_amount || 0) / c.total_amount) * 100)) : 0
+  const discAmtView = c.discount_amount || calcDiscount(String(c.total_amount || ''), c.discount_type, String(c.discount_value || ''))
+  const remain = (c.total_amount || 0) - discAmtView - (c.paid_amount || 0)
 
   return (
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -524,18 +632,17 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.contract_type === '본계약' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
             {c.contract_type}
           </span>
-          <span className="text-sm font-bold text-slate-800 ml-2">{c.lot_number || '호수 미정'}</span>
+          <span className="text-sm font-bold text-slate-800 ml-2">{c.lot_number || '안치단 미정'}</span>
         </div>
-        <button onClick={() => setEditing(true)} className="text-xs text-indigo-500 font-semibold hover:text-indigo-700">수정</button>
+        <button onClick={startEditing} className="text-xs text-indigo-500 font-semibold hover:text-indigo-700">수정</button>
       </div>
-      {c.total_amount && (
-        <div className="mb-2">
-          <div className="flex justify-between text-xs text-slate-500 mb-1">
-            <span>계약금 {(c.paid_amount || 0).toLocaleString()}원</span>
-            <span>{c.total_amount.toLocaleString()}원 ({paidPct}%)</span>
-          </div>
-          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
+      {c.total_amount > 0 && (
+        <div className="bg-white rounded-xl p-2.5 border border-slate-200 space-y-1 mb-2">
+          <FinRow2 label="분양금" value={c.total_amount} />
+          {discAmtView > 0 && <FinRow2 label={c.discount_type === 'rate' ? `할인 (${c.discount_value}%)` : '할인'} value={-discAmtView} color="text-indigo-600" />}
+          {c.paid_amount > 0 && <FinRow2 label="계약금" value={-c.paid_amount} color="text-amber-600" />}
+          <div className="border-t border-slate-100 pt-1">
+            <FinRow2 label="잔금" value={remain} color={remain <= 0 ? 'text-emerald-600' : 'text-rose-600'} bold />
           </div>
         </div>
       )}
@@ -546,6 +653,15 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
           📋 {c.history}
         </div>
       )}
+    </div>
+  )
+}
+
+function FinRow2({ label, value, color, bold }: { label: string; value: number; color?: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between items-center text-xs ${bold ? 'font-bold' : 'font-medium'}`}>
+      <span className="text-slate-500">{label}</span>
+      <span className={color || 'text-slate-800'}>{value < 0 ? '-' : ''}{Math.abs(value).toLocaleString()}원</span>
     </div>
   )
 }
