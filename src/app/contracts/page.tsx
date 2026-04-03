@@ -43,6 +43,9 @@ function ContractsContent() {
   const [promotingId, setPromotingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [comments, setComments] = useState<Record<string, any[]>>({})
+  const [newComment, setNewComment] = useState<Record<string, string>>({})
+  const [postingComment, setPostingComment] = useState<string | null>(null)
 
   const defaultForm = {
     customer_id: searchParams.get('customer_id') || '',
@@ -99,6 +102,31 @@ function ContractsContent() {
     setContracts(cRes.data || [])
     setCustomers(custRes.data || [])
     setDataLoading(false)
+  }
+
+  async function loadComments(contractId: string) {
+    const { data } = await supabase
+      .from('contract_comments')
+      .select('*, user:users!user_id(name, role)')
+      .eq('contract_id', contractId)
+      .order('created_at', { ascending: true })
+    setComments(prev => ({ ...prev, [contractId]: data || [] }))
+  }
+
+  async function postComment(contractId: string) {
+    const content = (newComment[contractId] || '').trim()
+    if (!content) return
+    setPostingComment(contractId)
+    await supabase.from('contract_comments').insert({ contract_id: contractId, user_id: user?.id, content })
+    setNewComment(prev => ({ ...prev, [contractId]: '' }))
+    setPostingComment(null)
+    loadComments(contractId)
+  }
+
+  async function deleteComment(commentId: string, contractId: string) {
+    if (!confirm('댓글을 삭제하시겠습니까?')) return
+    await supabase.from('contract_comments').delete().eq('id', commentId)
+    loadComments(contractId)
   }
 
   function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
@@ -403,7 +431,11 @@ function ContractsContent() {
                   <div className={`h-1 ${c.contract_type === '본계약' ? 'bg-emerald-500' : isExpiringSoon ? 'bg-rose-500' : 'bg-amber-400'}`} />
 
                   {/* 헤더 — 클릭 시 확장 */}
-                  <button type="button" onClick={() => setExpandedId(isExpanded ? null : c.id)} className="w-full px-4 py-3.5 text-left">
+                  <button type="button" onClick={() => {
+                    const next = isExpanded ? null : c.id
+                    setExpandedId(next)
+                    if (next && !comments[next]) loadComments(next)
+                  }} className="w-full px-4 py-3.5 text-left">
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-bold text-slate-900">{c.customer?.name}</p>
@@ -479,6 +511,49 @@ function ContractsContent() {
                           📋 {c.history}
                         </div>
                       )}
+                      {/* 메모 섹션 */}
+                      <div className="border-t border-slate-100 pt-3">
+                        <p className="text-xs font-bold text-slate-600 mb-2">💬 메모</p>
+                        <div className="space-y-2 mb-2">
+                          {(comments[c.id] || []).length === 0 && (
+                            <p className="text-xs text-slate-400">아직 메모가 없습니다</p>
+                          )}
+                          {(comments[c.id] || []).map((cm: any) => (
+                            <div key={cm.id} className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                              <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-slate-800">{cm.user?.name}</span>
+                                  <span className="text-[10px] text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">{cm.user?.role === 'admin' ? '관리자' : '상담자'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-400">{new Date(cm.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                  {(user?.id === cm.user_id || user?.role === 'admin') && (
+                                    <button onClick={() => deleteComment(cm.id, c.id)} className="text-[11px] text-rose-400 hover:text-rose-600">삭제</button>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-slate-700 whitespace-pre-wrap">{cm.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <textarea
+                            value={newComment[c.id] || ''}
+                            onChange={e => setNewComment(prev => ({ ...prev, [c.id]: e.target.value }))}
+                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white resize-none h-14 transition"
+                            placeholder="메모 입력..."
+                            onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) postComment(c.id) }}
+                          />
+                          <button
+                            onClick={() => postComment(c.id)}
+                            disabled={postingComment === c.id || !(newComment[c.id] || '').trim()}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl text-xs font-bold disabled:opacity-40 transition-colors"
+                          >
+                            등록
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="flex gap-2 pt-1">
                         <button onClick={() => { startEdit(c); setExpandedId(null) }}
                           className="flex-1 text-xs font-semibold border border-slate-200 text-slate-600 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">

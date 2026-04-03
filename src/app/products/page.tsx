@@ -164,7 +164,11 @@ function ProductsContent() {
     urn_name: '',
     consumer_price: '',
     funeral_date: '',
-    engraving_info: '',
+    engraving_tbd: 'true',
+    engraving_birth: '',
+    engraving_birth_type: '양력',
+    engraving_death: '',
+    engraving_death_type: '양력',
     relocation_date: '',
     notes: '',
   }
@@ -214,7 +218,11 @@ function ProductsContent() {
       urn_name: p.urn_name || '',
       consumer_price: p.consumer_price || '',
       funeral_date: p.funeral_date ? p.funeral_date.split('T')[0] : '',
-      engraving_info: p.engraving_info || '',
+      engraving_tbd: p.engraving_tbd === false ? 'false' : 'true',
+      engraving_birth: p.engraving_birth || '',
+      engraving_birth_type: p.engraving_birth_type || '양력',
+      engraving_death: p.engraving_death || '',
+      engraving_death_type: p.engraving_death_type || '양력',
       relocation_date: p.relocation_date ? p.relocation_date.split('T')[0] : '',
       notes: p.notes || '',
     })
@@ -234,6 +242,7 @@ function ProductsContent() {
     e.preventDefault()
     setSaving(true)
 
+    const isTbd = form.engraving_tbd === 'true'
     const payload = {
       product_type: form.product_type,
       sangjo_company: form.sangjo_company || null,
@@ -241,7 +250,12 @@ function ProductsContent() {
       urn_name: form.product_type === '유골함' ? form.urn_name || null : null,
       consumer_price: form.product_type === '유골함' ? form.consumer_price || null : null,
       funeral_date: form.funeral_date || null,
-      engraving_info: form.engraving_info || null,
+      engraving_tbd: form.product_type === '유골함' ? isTbd : null,
+      engraving_birth: form.product_type === '유골함' && !isTbd ? form.engraving_birth || null : null,
+      engraving_birth_type: form.product_type === '유골함' && !isTbd ? form.engraving_birth_type : null,
+      engraving_death: form.product_type === '유골함' && !isTbd ? form.engraving_death || null : null,
+      engraving_death_type: form.product_type === '유골함' && !isTbd ? form.engraving_death_type : null,
+      engraving_info: null, // deprecated
       relocation_date: form.relocation_date || null,
       notes: form.notes || null,
     }
@@ -400,16 +414,67 @@ function ProductsContent() {
               </div>
 
               {form.product_type === '유골함' && (
-                <>
-                  <div>
-                    <label className={lbl}>장례일</label>
-                    <input type="date" value={form.funeral_date} onChange={e => set('funeral_date', e.target.value)} className={cls} />
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-indigo-700">✏️ 각인 정보</p>
+                    <button
+                      type="button"
+                      onClick={() => set('engraving_tbd', form.engraving_tbd === 'true' ? 'false' : 'true')}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${form.engraving_tbd === 'true' ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-500 border-slate-300'}`}
+                    >
+                      {form.engraving_tbd === 'true' ? '미정' : '입력'}
+                    </button>
                   </div>
-                  <div>
-                    <label className={lbl}>각인 정보</label>
-                    <input value={form.engraving_info} onChange={e => set('engraving_info', e.target.value)} className={cls} placeholder="각인 내용 입력" />
-                  </div>
-                </>
+
+                  {form.engraving_tbd === 'false' && (
+                    <>
+                      {/* 생 */}
+                      <div>
+                        <label className={lbl}>생 (출생일)</label>
+                        <div className="flex gap-2">
+                          <input
+                            value={form.engraving_birth}
+                            onChange={e => set('engraving_birth', e.target.value)}
+                            className={cls}
+                            placeholder="예: 1991.11.01"
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            {['양력', '음력'].map(t => (
+                              <button key={t} type="button" onClick={() => set('engraving_birth_type', t)}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${form.engraving_birth_type === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {/* 졸 */}
+                      <div>
+                        <label className={lbl}>졸 (사망일)</label>
+                        <div className="flex gap-2">
+                          <input
+                            value={form.engraving_death}
+                            onChange={e => set('engraving_death', e.target.value)}
+                            className={cls}
+                            placeholder="예: 2026.03.21"
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            {['양력', '음력'].map(t => (
+                              <button key={t} type="button" onClick={() => set('engraving_death_type', t)}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${form.engraving_death_type === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {form.engraving_tbd === 'true' && (
+                    <p className="text-xs text-indigo-400">장례 후 각인 정보를 입력해주세요</p>
+                  )}
+                </div>
               )}
 
               {form.product_type === '개장업' && (
@@ -482,7 +547,11 @@ function ProductsContent() {
                     {!isExpanded && (
                       <div className="mt-1.5 flex gap-3 flex-wrap">
                         {p.urn_name && <span className="text-xs text-purple-600 font-medium">{p.urn_name}</span>}
-                        {p.funeral_date && <span className="text-xs text-slate-400">장례일: {new Date(p.funeral_date).toLocaleDateString('ko-KR')}</span>}
+                        {p.product_type === '유골함' && (
+                          <span className={`text-xs font-medium ${p.engraving_tbd !== false ? 'text-rose-400' : 'text-indigo-500'}`}>
+                            {p.engraving_tbd !== false ? '각인 미정' : `생 ${p.engraving_birth || '-'} / 졸 ${p.engraving_death || '-'}`}
+                          </span>
+                        )}
                         {p.notes && <span className="text-xs text-slate-400 truncate max-w-[180px]">📝 {p.notes}</span>}
                       </div>
                     )}
@@ -499,7 +568,19 @@ function ProductsContent() {
                       )}
                       {p.sangjo_company && <DetailRow label="상조 업체" value={p.sangjo_company} />}
                       {p.funeral_date && <DetailRow label="장례일" value={new Date(p.funeral_date).toLocaleDateString('ko-KR')} />}
-                      {p.engraving_info && <DetailRow label="각인" value={p.engraving_info} />}
+                      {p.product_type === '유골함' && (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-1.5">
+                          <p className="text-xs font-bold text-indigo-700 mb-2">✏️ 각인 정보</p>
+                          {p.engraving_tbd === true || (!p.engraving_birth && !p.engraving_death) ? (
+                            <p className="text-xs text-indigo-400 font-medium">미정 — 장례 후 입력 예정</p>
+                          ) : (
+                            <>
+                              {p.engraving_birth && <DetailRow label={`생 (${p.engraving_birth_type || '양력'})`} value={p.engraving_birth} />}
+                              {p.engraving_death && <DetailRow label={`졸 (${p.engraving_death_type || '양력'})`} value={p.engraving_death} />}
+                            </>
+                          )}
+                        </div>
+                      )}
                       {p.relocation_date && <DetailRow label="개장일" value={new Date(p.relocation_date).toLocaleDateString('ko-KR')} />}
                       {p.amount && <DetailRow label="판매가" value={`${p.amount.toLocaleString()}원`} />}
                       {p.notes && (
