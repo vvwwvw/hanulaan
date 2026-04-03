@@ -66,7 +66,11 @@ function CustomersContent() {
     return true
   })
 
-  if (loading || !user) return null
+  if (loading || !user) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="pb-20">

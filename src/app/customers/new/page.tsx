@@ -90,7 +90,11 @@ export default function NewCustomerPage() {
     }
   }
 
-  if (loading || !user) return null
+  if (loading || !user) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+    </div>
+  )
 
   const TYPE_OPTIONS = [
     { value: '장례중', label: '⚰️ 장례중', color: 'bg-purple-50 border-purple-200 text-purple-700', activeColor: 'bg-purple-600 border-purple-600 text-white' },

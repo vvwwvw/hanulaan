@@ -115,7 +115,11 @@ function ContractsContent() {
     return Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000)
   }
 
-  if (loading || !user) return null
+  if (loading || !user) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+    </div>
+  )
 
   const activeFormId = editingId || promotingId
   const formTitle = promotingId ? '본계약 전환' : editingId ? '계약 수정' : '계약 등록'
