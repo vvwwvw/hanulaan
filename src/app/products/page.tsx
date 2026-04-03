@@ -157,6 +157,7 @@ function ProductsContent() {
   const [saving, setSaving] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [productFilter, setProductFilter] = useState('all')
+  const [showSold, setShowSold] = useState(false)
   const [toast, setToast] = useState('')
 
   const emptyForm = {
@@ -243,6 +244,12 @@ function ProductsContent() {
     loadAll()
   }
 
+  async function markAsSold(id: string) {
+    await supabase.from('sales_products').update({ is_sold: true }).eq('id', id)
+    loadAll()
+    showToast('판매완료 처리되었습니다')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -294,11 +301,15 @@ function ProductsContent() {
 
   const showingForm = showForm || !!editingId
   const isKnownUrn = URN_PRODUCTS.some(u => u.name === form.urn_name)
-  const filteredProducts = products.filter(p => {
+
+  const baseFiltered = products.filter(p => {
     if (productFilter !== 'all' && p.product_type !== productFilter) return false
     if (productSearch && !(p.customer?.name || '').includes(productSearch)) return false
     return true
   })
+  const activeProducts = baseFiltered.filter(p => !p.is_sold)
+  const soldProducts = baseFiltered.filter(p => p.is_sold)
+  const filteredProducts = showSold ? soldProducts : activeProducts
 
   return (
     <div className="pb-20">
@@ -510,6 +521,17 @@ function ProductsContent() {
         {/* 검색 + 필터 */}
         {!showingForm && (
           <>
+            {/* 진행중 / 판매완료 탭 */}
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => setShowSold(false)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${!showSold ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+                진행중 {activeProducts.length > 0 && <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${!showSold ? 'bg-white/20' : 'bg-slate-100'}`}>{activeProducts.length}</span>}
+              </button>
+              <button onClick={() => setShowSold(true)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${showSold ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+                판매완료 {soldProducts.length > 0 && <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${showSold ? 'bg-white/20' : 'bg-slate-100'}`}>{soldProducts.length}</span>}
+              </button>
+            </div>
             <div className="relative mb-3">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
@@ -525,7 +547,6 @@ function ProductsContent() {
                   {f.label}
                 </button>
               ))}
-              {filteredProducts.length > 0 && <span className="ml-auto text-xs text-slate-400 self-center shrink-0">{filteredProducts.length}건</span>}
             </div>
           </>
         )}
@@ -554,9 +575,10 @@ function ProductsContent() {
             {filteredProducts.map(p => {
               const conf = PRODUCT_CONFIG[p.product_type] || { icon: '📦', gradient: 'from-slate-400 to-slate-500', lightBg: 'bg-slate-50', textColor: 'text-slate-600' }
               const isExpanded = expandedId === p.id
+              const isSold = !!p.is_sold
               return (
-                <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className={`h-1 bg-gradient-to-r ${conf.gradient}`} />
+                <div key={p.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isSold ? 'border-emerald-100 opacity-75' : 'border-slate-100'}`}>
+                  <div className={`h-1 ${isSold ? 'bg-emerald-400' : `bg-gradient-to-r ${conf.gradient}`}`} />
 
                   {/* 헤더 — 클릭 시 확장 */}
                   <button
@@ -577,6 +599,7 @@ function ProductsContent() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {isSold && <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">완료</span>}
                         {p.amount && <p className="text-sm font-bold text-slate-900">{p.amount.toLocaleString()}원</p>}
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -632,12 +655,20 @@ function ProductsContent() {
                       )}
                       <p className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString('ko-KR')}</p>
                       <div className="flex gap-2 pt-1">
-                        <button onClick={() => { startEdit(p); setExpandedId(null) }}
-                          className="flex-1 text-xs font-semibold border border-indigo-200 text-indigo-600 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors">
-                          수정
-                        </button>
+                        {!isSold && (
+                          <>
+                            <button onClick={() => { startEdit(p); setExpandedId(null) }}
+                              className="flex-1 text-xs font-semibold border border-indigo-200 text-indigo-600 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors">
+                              수정
+                            </button>
+                            <button onClick={() => { if (confirm('판매완료 처리하시겠습니까?')) markAsSold(p.id) }}
+                              className="flex-1 text-xs font-bold border border-emerald-300 text-emerald-700 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
+                              판매완료
+                            </button>
+                          </>
+                        )}
                         <button onClick={() => deleteProduct(p.id)}
-                          className="flex-1 text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors">
+                          className={`text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors ${isSold ? 'flex-1' : 'px-4'}`}>
                           삭제
                         </button>
                       </div>

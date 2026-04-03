@@ -10,11 +10,11 @@ const cls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm tex
 const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 const FORM_CACHE = 'hanulaan_contract_form'
 
-// 날짜 문자열에 n일 더하기 (YYYY-MM-DD → YYYY-MM-DD)
+// 날짜 문자열에 n일 더하기 (YYYY-MM-DD → YYYY-MM-DD), 타임존 무관
 function addDays(dateStr: string, n: number) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const dt = new Date(y, m - 1, d + n)
-  return dt.toISOString().split('T')[0]
+  return [dt.getFullYear(), String(dt.getMonth() + 1).padStart(2, '0'), String(dt.getDate()).padStart(2, '0')].join('-')
 }
 
 // 숫자 → 회계 형식 (1000000 → 1,000,000)
@@ -144,12 +144,14 @@ function ContractsContent() {
   function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
 
   function startEdit(c: any) {
+    clearCache()
     setEditingId(c.id); setPromotingId(null); setShowForm(false)
+    const pDate = c.provisional_date || ''
     setForm({
       customer_id: c.customer_id,
       contract_type: c.contract_type,
-      provisional_date: c.provisional_date || '',
-      expiry_date: c.expiry_date || '',
+      provisional_date: pDate,
+      expiry_date: c.contract_type === '가계약' && pDate ? addDays(pDate, 14) : c.expiry_date || '',
       lot_number: c.lot_number || '',
       total_amount: c.total_amount ? String(c.total_amount) : '',
       paid_amount: c.paid_amount ? String(c.paid_amount) : '',

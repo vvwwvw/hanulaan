@@ -13,7 +13,7 @@ const lbl = 'text-xs font-semibold text-slate-500 block mb-1.5'
 function addDays(dateStr: string, n: number) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const dt = new Date(y, m - 1, d + n)
-  return dt.toISOString().split('T')[0]
+  return [dt.getFullYear(), String(dt.getMonth() + 1).padStart(2, '0'), String(dt.getDate()).padStart(2, '0')].join('-')
 }
 
 function numFmt(v: string) {
@@ -528,10 +528,11 @@ const ITEM_CACHE_PREFIX = 'hanulaan_contract_item_'
 function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave: () => void; supabase: any }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const pDate = c.provisional_date || ''
   const initForm = {
     contract_type: c.contract_type,
-    provisional_date: c.provisional_date || '',
-    expiry_date: c.expiry_date || '',
+    provisional_date: pDate,
+    expiry_date: c.contract_type === '가계약' && pDate ? addDays(pDate, 14) : c.expiry_date || '',
     lot_number: c.lot_number || '',
     total_amount: c.total_amount ? String(c.total_amount) : '',
     paid_amount: c.paid_amount ? String(c.paid_amount) : '',
@@ -541,8 +542,9 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
   }
   const [form, setForm] = useState(initForm)
 
-  // 수정 시작 시 localStorage에서 복원
+  // 수정 시작 시 캐시 무시하고 fresh 로드 (만료일 재계산)
   function startEditing() {
+    try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {}
     try {
       const saved = localStorage.getItem(ITEM_CACHE_PREFIX + c.id)
       if (saved) setForm(JSON.parse(saved))
