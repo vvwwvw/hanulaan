@@ -120,11 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
+    // 이전 세션 토큰 제거 → 새 로그인 방해 방지
+    try {
+      const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+      if (key) localStorage.removeItem(key)
+    } catch {}
+
     const loginPromise = supabase.auth.signInWithPassword({ email, password })
       .then(({ error }) => error?.message ?? null)
       .catch(() => '로그인 중 오류가 발생했습니다.')
     const timeout = new Promise<string>(resolve =>
-      setTimeout(() => resolve('요청이 너무 오래 걸립니다. 다시 시도해주세요.'), 10000)
+      setTimeout(() => resolve('요청이 너무 오래 걸립니다. 다시 시도해주세요.'), 15000)
     )
     return Promise.race([loginPromise, timeout])
   }
