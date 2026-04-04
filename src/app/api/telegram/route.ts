@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { notifyNewCustomer, notifyWalkingAssigned, notifyNewContract, notifyFuneralOccurred } from '@/lib/telegram'
+import { notifyNewCustomer, notifyWalkingAssigned, notifyNewContract, notifyFuneralOccurred, notifyNewComment } from '@/lib/telegram'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
       break
     case 'funeral_occurred':
       await notifyFuneralOccurred(body.customerName, body.productType)
+      break
+    case 'new_comment':
+      await notifyNewComment(body.customerName, body.authorName, body.role, body.content, body.source)
       break
   }
 

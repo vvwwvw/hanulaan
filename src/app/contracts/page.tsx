@@ -136,6 +136,14 @@ function ContractsContent() {
     if (!content) return
     setPostingComment(contractId)
     await supabase.from('contract_comments').insert({ contract_id: contractId, user_id: user?.id, content })
+    const contract = contracts.find(c => c.id === contractId)
+    if (contract) {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'new_comment', customerName: contract.customer?.name || '', authorName: user?.name || '', role: user?.role || '', content, source: '계약' }),
+      })
+    }
     setNewComment(prev => ({ ...prev, [contractId]: '' }))
     setPostingComment(null)
     loadComments(contractId)

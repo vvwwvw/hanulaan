@@ -173,7 +173,13 @@ export default function CustomerDetailPage() {
   async function postComment() {
     if (!newComment.trim()) return
     setPostingComment(true)
-    await supabase.from('comments').insert({ customer_id: customer.id, user_id: user?.id, content: newComment.trim() })
+    const content = newComment.trim()
+    await supabase.from('comments').insert({ customer_id: customer.id, user_id: user?.id, content })
+    await fetch('/api/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'new_comment', customerName: customer.name, authorName: user?.name || '', role: user?.role || '', content, source: '고객' }),
+    })
     setNewComment('')
     setPostingComment(false)
     loadAll()

@@ -47,3 +47,11 @@ export function notifyNewContract(customerName: string, lotNumber: string, amoun
     `🎉 <b>계약 완료</b>\n고객명: ${customerName}\n호수: ${lotNumber}\n금액: ${amount}`
   )
 }
+
+export function notifyNewComment(customerName: string, authorName: string, role: string, content: string, source: '고객' | '계약') {
+  const preview = content.length > 50 ? content.slice(0, 50) + '...' : content
+  const roleLabel = role === 'admin' ? '관리자' : '상담자'
+  return sendTelegram(
+    `💬 <b>새 메모 등록 (${source})</b>\n고객명: ${customerName}\n작성자: ${authorName} (${roleLabel})\n내용: ${preview}`
+  )
+}
