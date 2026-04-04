@@ -24,11 +24,6 @@ export function notifyNewCustomer(name: string, type: string, isWalking: boolean
   )
 }
 
-export function notifyWalkingAssigned(customerName: string, salesName: string) {
-  return sendTelegram(
-    `✅ <b>워킹 배정 완료</b>\n고객명: ${customerName}\n담당 영업자: ${salesName}`
-  )
-}
 
 export function notifyContractExpiringSoon(customerName: string, daysLeft: number, expiryDate: string) {
   return sendTelegram(
