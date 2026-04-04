@@ -209,36 +209,48 @@ function ContractsContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const payload = buildPayload()
+    try {
+      const payload = buildPayload()
 
-    if (editingId) {
-      await supabase.from('contracts').update({ ...payload, is_completed: form.contract_type === '본계약' }).eq('id', editingId)
-      setEditingId(null)
-    } else if (promotingId) {
-      const orig = contracts.find(c => c.id === promotingId)
-      const historyText = `[가계약 이력] 계약일: ${orig.provisional_date || '-'} / 안치단: ${orig.lot_number || '-'} / 분양금: ${orig.total_amount ? orig.total_amount.toLocaleString() + '원' : '-'} / 계약금: ${orig.paid_amount ? orig.paid_amount.toLocaleString() + '원' : '-'} / 메모: ${orig.notes || '-'}`
-      await supabase.from('contracts').update({ ...payload, history: historyText, is_completed: true }).eq('id', promotingId)
-      await supabase.from('customers').update({ status: '계약완료' }).eq('id', form.customer_id)
-      const cust = customers.find(c => c.id === form.customer_id)
-      if (cust) {
-        await fetch('/api/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'new_contract', customerName: cust.name, lotNumber: form.lot_number || '미정', amount: form.total_amount ? parseInt(numRaw(form.total_amount)).toLocaleString() + '원' : '미입력' }) })
+      if (editingId) {
+        const { error } = await supabase.from('contracts').update({ ...payload, is_completed: form.contract_type === '본계약' }).eq('id', editingId)
+        if (error) throw new Error(error.message)
+        setEditingId(null)
+      } else if (promotingId) {
+        const orig = contracts.find(c => c.id === promotingId)
+        const historyText = `[가계약 이력] 계약일: ${orig.provisional_date || '-'} / 안치단: ${orig.lot_number || '-'} / 분양금: ${orig.total_amount ? orig.total_amount.toLocaleString() + '원' : '-'} / 계약금: ${orig.paid_amount ? orig.paid_amount.toLocaleString() + '원' : '-'} / 메모: ${orig.notes || '-'}`
+        const { error } = await supabase.from('contracts').update({ ...payload, history: historyText, is_completed: true }).eq('id', promotingId)
+        if (error) throw new Error(error.message)
+        await supabase.from('customers').update({ status: '계약완료' }).eq('id', form.customer_id)
+        const cust = customers.find(c => c.id === form.customer_id)
+        if (cust) {
+          await fetch('/api/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'new_contract', customerName: cust.name, lotNumber: form.lot_number || '미정', amount: form.total_amount ? parseInt(numRaw(form.total_amount)).toLocaleString() + '원' : '미입력' }) })
+        }
+        setPromotingId(null)
+      } else {
+        const { error } = await supabase.from('contracts').insert({ customer_id: form.customer_id, ...payload, is_completed: form.contract_type === '본계약' })
+        if (error) throw new Error(error.message)
+        await supabase.from('customers').update({ status: form.contract_type === '가계약' ? '가계약' : '계약완료' }).eq('id', form.customer_id)
+        setShowForm(false)
       }
-      setPromotingId(null)
-    } else {
-      await supabase.from('contracts').insert({ customer_id: form.customer_id, ...payload, is_completed: form.contract_type === '본계약' })
-      await supabase.from('customers').update({ status: form.contract_type === '가계약' ? '가계약' : '계약완료' }).eq('id', form.customer_id)
-      setShowForm(false)
-    }
 
-    clearCache()
-    setForm(defaultForm)
-    loadAll()
-    setSaving(false)
-    showToast('저장되었습니다')
+      clearCache()
+      setForm(defaultForm)
+      loadAll()
+      showToast('저장되었습니다')
+    } catch (err: any) {
+      alert('저장 오류: ' + (err?.message || '다시 시도해주세요'))
+      clearCache()
+    } finally {
+      setSaving(false)
+    }
   }
 
   function getDaysLeft(expiry: string) {
-    return Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000)
+    const [y, m, d] = expiry.split('-').map(Number)
+    const expiryLocal = new Date(y, m - 1, d)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return Math.ceil((expiryLocal.getTime() - today.getTime()) / 86400000)
   }
 
   if (loading || !user) return (

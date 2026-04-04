@@ -560,30 +560,36 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
 
   async function handleSave() {
     setSaving(true)
-    const discAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
-    const discValRaw = form.discount_value
-      ? (form.discount_type === 'rate' ? parseFloat(form.discount_value) : parseInt(numRaw(form.discount_value)))
-      : null
-    const computedExpiry = form.contract_type === '가계약' && form.provisional_date
-      ? addDays(form.provisional_date, 14)
-      : null
-    await supabase.from('contracts').update({
-      contract_type: form.contract_type,
-      provisional_date: form.provisional_date || null,
-      expiry_date: computedExpiry,
-      lot_number: form.lot_number || null,
-      total_amount: form.total_amount ? parseInt(numRaw(form.total_amount)) : null,
-      paid_amount: form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0,
-      discount_type: form.discount_type || null,
-      discount_value: discValRaw,
-      discount_amount: discAmt || null,
-      notes: form.notes || null,
-      is_completed: form.contract_type === '본계약',
-    }).eq('id', c.id)
-    try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {}
-    setSaving(false)
-    setEditing(false)
-    onSave()
+    try {
+      const discAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
+      const discValRaw = form.discount_value
+        ? (form.discount_type === 'rate' ? parseFloat(form.discount_value) : parseInt(numRaw(form.discount_value)))
+        : null
+      const computedExpiry = form.contract_type === '가계약' && form.provisional_date
+        ? addDays(form.provisional_date, 14)
+        : null
+      const { error } = await supabase.from('contracts').update({
+        contract_type: form.contract_type,
+        provisional_date: form.provisional_date || null,
+        expiry_date: computedExpiry,
+        lot_number: form.lot_number || null,
+        total_amount: form.total_amount ? parseInt(numRaw(form.total_amount)) : null,
+        paid_amount: form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0,
+        discount_type: form.discount_type || null,
+        discount_value: discValRaw,
+        discount_amount: discAmt || null,
+        notes: form.notes || null,
+        is_completed: form.contract_type === '본계약',
+      }).eq('id', c.id)
+      if (error) throw new Error(error.message)
+      try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {}
+      setEditing(false)
+      onSave()
+    } catch (err: any) {
+      alert('저장 오류: ' + (err?.message || '다시 시도해주세요'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const cls2 = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition'
