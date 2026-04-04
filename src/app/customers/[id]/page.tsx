@@ -542,14 +542,10 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
   }
   const [form, setForm] = useState(initForm)
 
-  // 수정 시작 시 캐시 무시하고 fresh 로드 (만료일 재계산)
+  // 수정 시작 시 캐시 무시하고 항상 재계산된 initForm 사용
   function startEditing() {
     try { localStorage.removeItem(ITEM_CACHE_PREFIX + c.id) } catch {}
-    try {
-      const saved = localStorage.getItem(ITEM_CACHE_PREFIX + c.id)
-      if (saved) setForm(JSON.parse(saved))
-      else setForm(initForm)
-    } catch { setForm(initForm) }
+    setForm(initForm)
     setEditing(true)
   }
 
@@ -565,15 +561,21 @@ function ContractItem({ contract: c, onSave, supabase }: { contract: any; onSave
   async function handleSave() {
     setSaving(true)
     const discAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
+    const discValRaw = form.discount_value
+      ? (form.discount_type === 'rate' ? parseFloat(form.discount_value) : parseInt(numRaw(form.discount_value)))
+      : null
+    const computedExpiry = form.contract_type === '가계약' && form.provisional_date
+      ? addDays(form.provisional_date, 14)
+      : null
     await supabase.from('contracts').update({
       contract_type: form.contract_type,
       provisional_date: form.provisional_date || null,
-      expiry_date: form.contract_type === '가계약' ? form.expiry_date || null : null,
+      expiry_date: computedExpiry,
       lot_number: form.lot_number || null,
       total_amount: form.total_amount ? parseInt(numRaw(form.total_amount)) : null,
       paid_amount: form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0,
       discount_type: form.discount_type || null,
-      discount_value: form.discount_value ? parseFloat(form.discount_value) : null,
+      discount_value: discValRaw,
       discount_amount: discAmt || null,
       notes: form.notes || null,
       is_completed: form.contract_type === '본계약',

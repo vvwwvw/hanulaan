@@ -182,16 +182,25 @@ function ContractsContent() {
   }
 
   function buildPayload() {
+    const totalRawVal = form.total_amount ? parseInt(numRaw(form.total_amount)) : null
+    const paidRawVal = form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0
+    const discountValRaw = form.discount_value
+      ? (form.discount_type === 'rate' ? parseFloat(form.discount_value) : parseInt(numRaw(form.discount_value)))
+      : null
     const discountAmt = calcDiscount(form.total_amount, form.discount_type, form.discount_value)
+    // 만료일은 항상 계약일 기준 +14일로 재계산 (캐시·구DB값 무시)
+    const computedExpiry = form.contract_type === '가계약' && form.provisional_date
+      ? addDays(form.provisional_date, 14)
+      : null
     return {
       contract_type: form.contract_type,
       provisional_date: form.provisional_date || null,
-      expiry_date: form.contract_type === '가계약' ? form.expiry_date || null : null,
+      expiry_date: computedExpiry,
       lot_number: form.lot_number || null,
-      total_amount: form.total_amount ? parseInt(numRaw(form.total_amount)) : null,
-      paid_amount: form.paid_amount ? parseInt(numRaw(form.paid_amount)) : 0,
+      total_amount: totalRawVal,
+      paid_amount: paidRawVal,
       discount_type: form.discount_type || null,
-      discount_value: form.discount_value ? parseFloat(form.discount_value) : null,
+      discount_value: discountValRaw,
       discount_amount: discountAmt || null,
       notes: form.notes || null,
     }
