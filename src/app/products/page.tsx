@@ -257,6 +257,12 @@ function ProductsContent() {
     showToast('판매완료 처리되었습니다')
   }
 
+  async function markAsActive(id: string) {
+    await supabase.from('sales_products').update({ is_sold: false }).eq('id', id)
+    loadAll()
+    showToast('진행중으로 변경되었습니다')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -662,7 +668,18 @@ function ProductsContent() {
                       )}
                       <p className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString('ko-KR')}</p>
                       <div className="flex gap-2 pt-1">
-                        {!isSold && (
+                        {isSold ? (
+                          <>
+                            <button onClick={() => markAsActive(p.id)}
+                              className="flex-1 text-xs font-bold border border-slate-300 text-slate-600 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                              ↩ 진행중으로
+                            </button>
+                            <button onClick={() => deleteProduct(p.id)}
+                              className="px-4 text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors">
+                              삭제
+                            </button>
+                          </>
+                        ) : (
                           <>
                             <button onClick={() => { startEdit(p); setExpandedId(null) }}
                               className="flex-1 text-xs font-semibold border border-indigo-200 text-indigo-600 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors">
@@ -672,12 +689,12 @@ function ProductsContent() {
                               className="flex-1 text-xs font-bold border border-emerald-300 text-emerald-700 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
                               판매완료
                             </button>
+                            <button onClick={() => deleteProduct(p.id)}
+                              className="px-4 text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors">
+                              삭제
+                            </button>
                           </>
                         )}
-                        <button onClick={() => deleteProduct(p.id)}
-                          className={`text-xs font-semibold border border-rose-200 text-rose-500 py-2.5 rounded-xl hover:bg-rose-50 transition-colors ${isSold ? 'flex-1' : 'px-4'}`}>
-                          삭제
-                        </button>
                       </div>
                     </div>
                   )}
