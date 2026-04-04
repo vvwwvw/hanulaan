@@ -97,18 +97,24 @@ export default function CustomerDetailPage() {
 
   async function loadAll() {
     const id = params.id as string
+    setDataLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
       const [cRes, contractRes, productRes, commentRes] = await Promise.all([
-        supabase.from('customers').select('*, counselor:users!counselor_id(name)').eq('id', id).single(),
-        supabase.from('contracts').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
-        supabase.from('sales_products').select('*').eq('customer_id', id).order('created_at', { ascending: false }),
-        supabase.from('comments').select('*, user:users!user_id(name, role)').eq('customer_id', id).order('created_at', { ascending: true }),
+        supabase.from('customers').select('*, counselor:users!counselor_id(name)').eq('id', id).single().abortSignal(controller.signal),
+        supabase.from('contracts').select('*').eq('customer_id', id).order('created_at', { ascending: false }).abortSignal(controller.signal),
+        supabase.from('sales_products').select('*').eq('customer_id', id).order('created_at', { ascending: false }).abortSignal(controller.signal),
+        supabase.from('comments').select('*, user:users!user_id(name, role)').eq('customer_id', id).order('created_at', { ascending: true }).abortSignal(controller.signal),
       ])
       setCustomer(cRes.data)
       setContracts(contractRes.data || [])
       setProducts(productRes.data || [])
       setComments(commentRes.data || [])
+    } catch {
+      // timeout or network error
     } finally {
+      clearTimeout(timer)
       setDataLoading(false)
     }
   }

@@ -107,14 +107,20 @@ function ContractsContent() {
 
 
   async function loadAll() {
+    setDataLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
       const [cRes, custRes] = await Promise.all([
-        supabase.from('contracts').select('*, customer:customers(id, name)').order('created_at', { ascending: false }),
-        supabase.from('customers').select('id, name'),
+        supabase.from('contracts').select('*, customer:customers(id, name)').order('created_at', { ascending: false }).abortSignal(controller.signal),
+        supabase.from('customers').select('id, name').abortSignal(controller.signal),
       ])
       setContracts(cRes.data || [])
       setCustomers(custRes.data || [])
+    } catch {
+      // timeout or network error
     } finally {
+      clearTimeout(timer)
       setDataLoading(false)
     }
   }

@@ -39,15 +39,18 @@ export default function DashboardPage() {
 
 
   async function loadDashboard() {
+    setDataLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
       const today = new Date().toISOString().split('T')[0]
       const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
 
       const [customersRes, provisionalRes, funeralRes, contractsRes] = await Promise.all([
-        supabase.from('customers').select('id', { count: 'exact', head: true }),
-        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('status', '가계약'),
-        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_type', '위중'),
-        supabase.from('contracts').select('id, expiry_date, customer:customers(name)').eq('contract_type', '가계약').eq('is_completed', false).lte('expiry_date', threeDaysLater).gte('expiry_date', today),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).abortSignal(controller.signal),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('status', '가계약').abortSignal(controller.signal),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_type', '위중').abortSignal(controller.signal),
+        supabase.from('contracts').select('id, expiry_date, customer:customers(name)').eq('contract_type', '가계약').eq('is_completed', false).lte('expiry_date', threeDaysLater).gte('expiry_date', today).abortSignal(controller.signal),
       ])
 
       const expiring = (contractsRes.data || []).map((c: any) => ({
@@ -62,7 +65,10 @@ export default function DashboardPage() {
         funeralCount: funeralRes.count || 0,
       })
       setExpiringContracts(expiring)
+    } catch {
+      // timeout or network error — show empty state
     } finally {
+      clearTimeout(timer)
       setDataLoading(false)
     }
   }

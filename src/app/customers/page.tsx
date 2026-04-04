@@ -40,6 +40,7 @@ function CustomersContent() {
   const supabase = createClient()
   const [customers, setCustomers] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filter, setFilter] = useState(searchParams.get('filter') || 'all')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'newest'|'visit'>('visit')
@@ -54,13 +55,22 @@ function CustomersContent() {
 
 
   async function loadCustomers() {
+    setLoadError(false)
+    setDataLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('customers')
         .select('*')
         .order('created_at', { ascending: false })
+        .abortSignal(controller.signal)
+      if (error) throw error
       setCustomers(data || [])
+    } catch {
+      setLoadError(true)
     } finally {
+      clearTimeout(timer)
       setDataLoading(false)
     }
   }
@@ -153,6 +163,14 @@ function CustomersContent() {
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
             <p className="text-sm text-slate-400">불러오는 중...</p>
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <p className="text-sm text-slate-500 font-medium">불러오기 실패</p>
+            <button onClick={loadCustomers}
+              className="text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl hover:bg-indigo-100 transition">
+              다시 시도
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
