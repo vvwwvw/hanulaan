@@ -54,12 +54,15 @@ function CustomersContent() {
 
 
   async function loadCustomers() {
-    const { data } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setCustomers(data || [])
-    setDataLoading(false)
+    try {
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false })
+      setCustomers(data || [])
+    } finally {
+      setDataLoading(false)
+    }
   }
 
   const filtered = customers.filter(c => {

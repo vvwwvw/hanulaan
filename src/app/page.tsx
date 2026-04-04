@@ -39,29 +39,32 @@ export default function DashboardPage() {
 
 
   async function loadDashboard() {
-    const today = new Date().toISOString().split('T')[0]
-    const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
 
-    const [customersRes, provisionalRes, funeralRes, contractsRes] = await Promise.all([
-      supabase.from('customers').select('id', { count: 'exact', head: true }),
-      supabase.from('customers').select('id', { count: 'exact', head: true }).eq('status', '가계약'),
-      supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_type', '위중'),
-      supabase.from('contracts').select('id, expiry_date, customer:customers(name)').eq('contract_type', '가계약').eq('is_completed', false).lte('expiry_date', threeDaysLater).gte('expiry_date', today),
-    ])
+      const [customersRes, provisionalRes, funeralRes, contractsRes] = await Promise.all([
+        supabase.from('customers').select('id', { count: 'exact', head: true }),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('status', '가계약'),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_type', '위중'),
+        supabase.from('contracts').select('id, expiry_date, customer:customers(name)').eq('contract_type', '가계약').eq('is_completed', false).lte('expiry_date', threeDaysLater).gte('expiry_date', today),
+      ])
 
-    const expiring = (contractsRes.data || []).map((c: any) => ({
-      ...c,
-      daysLeft: Math.ceil((new Date(c.expiry_date).getTime() - Date.now()) / 86400000),
-    }))
+      const expiring = (contractsRes.data || []).map((c: any) => ({
+        ...c,
+        daysLeft: Math.ceil((new Date(c.expiry_date).getTime() - Date.now()) / 86400000),
+      }))
 
-    setStats({
-      totalCustomers: customersRes.count || 0,
-      provisionalCount: provisionalRes.count || 0,
-      expiringCount: expiring.length,
-      funeralCount: funeralRes.count || 0,
-    })
-    setExpiringContracts(expiring)
-    setDataLoading(false)
+      setStats({
+        totalCustomers: customersRes.count || 0,
+        provisionalCount: provisionalRes.count || 0,
+        expiringCount: expiring.length,
+        funeralCount: funeralRes.count || 0,
+      })
+      setExpiringContracts(expiring)
+    } finally {
+      setDataLoading(false)
+    }
   }
 
   if (loading || !user) return (

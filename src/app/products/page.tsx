@@ -188,13 +188,16 @@ function ProductsContent() {
 
 
   async function loadAll() {
-    const [pRes, cRes] = await Promise.all([
-      supabase.from('sales_products').select('*, customer:customers(id, name)').order('created_at', { ascending: false }),
-      supabase.from('customers').select('id, name'),
-    ])
-    setProducts(pRes.data || [])
-    setCustomers(cRes.data || [])
-    setDataLoading(false)
+    try {
+      const [pRes, cRes] = await Promise.all([
+        supabase.from('sales_products').select('*, customer:customers(id, name)').order('created_at', { ascending: false }),
+        supabase.from('customers').select('id, name'),
+      ])
+      setProducts(pRes.data || [])
+      setCustomers(cRes.data || [])
+    } finally {
+      setDataLoading(false)
+    }
   }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2500) }

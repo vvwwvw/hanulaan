@@ -107,13 +107,16 @@ function ContractsContent() {
 
 
   async function loadAll() {
-    const [cRes, custRes] = await Promise.all([
-      supabase.from('contracts').select('*, customer:customers(id, name)').order('created_at', { ascending: false }),
-      supabase.from('customers').select('id, name'),
-    ])
-    setContracts(cRes.data || [])
-    setCustomers(custRes.data || [])
-    setDataLoading(false)
+    try {
+      const [cRes, custRes] = await Promise.all([
+        supabase.from('contracts').select('*, customer:customers(id, name)').order('created_at', { ascending: false }),
+        supabase.from('customers').select('id, name'),
+      ])
+      setContracts(cRes.data || [])
+      setCustomers(custRes.data || [])
+    } finally {
+      setDataLoading(false)
+    }
   }
 
   async function loadComments(contractId: string) {
