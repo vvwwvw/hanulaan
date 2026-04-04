@@ -71,20 +71,21 @@ function ContractsContent() {
   }
   const [form, setForm] = useState(defaultForm)
 
-  // 앱 전환 후 복귀 시 폼 복원
+  // 앱 전환 후 복귀 시 신규 등록 폼만 복원 (수정/전환 모드는 복원 안 함)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(FORM_CACHE)
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (parsed.form) {
+        if (parsed.form && parsed.showForm && !parsed.editingId && !parsed.promotingId) {
           setForm(parsed.form)
-          if (parsed.editingId) { setEditingId(parsed.editingId); setShowForm(false) }
-          else if (parsed.promotingId) { setPromotingId(parsed.promotingId); setShowForm(false) }
-          else if (parsed.showForm) setShowForm(true)
+          setShowForm(true)
+        } else {
+          // 수정/전환 중 캐시는 버림 (오류로 남은 잔재 방지)
+          clearCache()
         }
       }
-    } catch {}
+    } catch { clearCache() }
   }, [])
 
   // 폼 변경 시 자동 저장

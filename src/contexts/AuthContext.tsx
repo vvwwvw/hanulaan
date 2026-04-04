@@ -44,6 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // 안전장치: 8초 후에도 loading이면 강제 해제
+    const timeout = setTimeout(() => {
+      if (mounted) setLoading(false)
+    }, 8000)
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
@@ -57,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (mounted) { setUser(null); setSessionReady(false) }
         }
         if (mounted) setLoading(false)
+        clearTimeout(timeout)
 
       } else if (event === 'SIGNED_IN') {
         if (session?.user) {
@@ -74,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => { mounted = false; subscription.unsubscribe() }
+    return () => { mounted = false; clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
   async function signIn(email: string, password: string): Promise<string | null> {
