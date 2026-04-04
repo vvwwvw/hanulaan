@@ -185,23 +185,32 @@ function CustomersContent() {
                       <p className="font-bold text-slate-900 text-sm">{c.name}</p>
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${typeConf.bg} ${typeConf.color}`}>{typeConf.label}</span>
                       {c.is_risky && <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">위험</span>}
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLES[c.status] || 'bg-slate-100 text-slate-500'}`}>
+                        {c.status}
+                      </span>
                     </div>
-                    {c.phone ? (
-                      <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()}
-                        className="text-xs text-indigo-500 font-medium mt-0.5 flex items-center gap-1 w-fit">
-                        📞 {c.phone}
-                      </a>
-                    ) : (
-                      <p className="text-xs text-slate-400 mt-0.5">연락처 없음</p>
-                    )}
+                    <p className="text-xs text-slate-500 mt-0.5">{c.phone || '연락처 없음'}</p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {c.visit_schedule ? `답사 ${new Date(c.visit_schedule).toLocaleDateString('ko-KR')}` : '답사일 미정'}
                     </p>
                   </div>
-                  {/* 상태 뱃지 */}
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${STATUS_STYLES[c.status] || 'bg-slate-100 text-slate-500'}`}>
-                    {c.status}
-                  </span>
+                  {/* 전화 / 문자 버튼 */}
+                  {c.phone && (
+                    <div className="flex flex-col gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      <a href={`tel:${c.phone}`}
+                        className="w-9 h-9 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl flex items-center justify-center transition-colors active:scale-95">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                          <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C9.6 21 3 14.4 3 6c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" fill="#6366f1"/>
+                        </svg>
+                      </a>
+                      <a href={`sms:${c.phone}`}
+                        className="w-9 h-9 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl flex items-center justify-center transition-colors active:scale-95">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="#10b981"/>
+                        </svg>
+                      </a>
+                    </div>
+                  )}
                 </div>
               )
             })}
