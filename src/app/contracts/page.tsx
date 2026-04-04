@@ -105,12 +105,6 @@ function ContractsContent() {
     if (sessionReady) loadAll()
   }, [sessionReady])
 
-  useEffect(() => {
-    if (user && !sessionReady) {
-      const t = setTimeout(() => loadAll(), 1500)
-      return () => clearTimeout(t)
-    }
-  }, [user])
 
   async function loadAll() {
     const [cRes, custRes] = await Promise.all([

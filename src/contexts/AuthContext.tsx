@@ -37,9 +37,11 @@ async function fetchProfile(email: string): Promise<User | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => loadCache())
+  const cachedUser = loadCache()
+  const [user, setUser] = useState<User | null>(cachedUser)
   const [loading, setLoading] = useState(true)
-  const [sessionReady, setSessionReady] = useState(false)
+  // 캐시된 유저가 있으면 즉시 sessionReady=true로 시작 (데이터 로드 바로 허용)
+  const [sessionReady, setSessionReady] = useState(!!cachedUser)
 
   useEffect(() => {
     let mounted = true
