@@ -52,6 +52,14 @@ function CustomersContent() {
     if (sessionReady) loadCustomers()
   }, [sessionReady])
 
+  // sessionReady가 늦으면 user가 있을 때 바로 로드
+  useEffect(() => {
+    if (user && !sessionReady) {
+      const t = setTimeout(() => loadCustomers(), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [user])
+
   async function loadCustomers() {
     const { data } = await supabase
       .from('customers')

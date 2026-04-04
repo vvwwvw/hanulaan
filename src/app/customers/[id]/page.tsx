@@ -94,6 +94,13 @@ export default function CustomerDetailPage() {
     if (sessionReady) loadAll()
   }, [sessionReady])
 
+  useEffect(() => {
+    if (user && !sessionReady) {
+      const t = setTimeout(() => loadAll(), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [user])
+
   async function loadAll() {
     const id = params.id as string
     const [cRes, contractRes, productRes, commentRes] = await Promise.all([

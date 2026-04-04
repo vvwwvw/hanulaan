@@ -37,6 +37,13 @@ export default function DashboardPage() {
     if (sessionReady) loadDashboard()
   }, [sessionReady])
 
+  useEffect(() => {
+    if (user && !sessionReady) {
+      const t = setTimeout(() => loadDashboard(), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [user])
+
   async function loadDashboard() {
     const today = new Date().toISOString().split('T')[0]
     const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
